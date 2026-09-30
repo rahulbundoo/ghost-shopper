@@ -1,0 +1,6 @@
+name = "GhostShopper Web"
+roles = ["frontend", "backend"]
+webhooks_path = "/webhooks"
+
+[commands]
+dev = "pnpm dev"

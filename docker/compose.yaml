@@ -1,0 +1,83 @@
+name: ghostshopper
+
+# Local development dependencies only; never deploy these credentials publicly.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ghostshopper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghostshopper_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-ghostshopper}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-15432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7.4-alpine
+    # BullMQ requires noeviction; AOF preserves local queue data across restarts.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-16379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    build:
+      context: .
+      dockerfile: minio.Dockerfile
+      target: minio
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ghostshopper_local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ghostshopper_local_only}
+      S3_BUCKET: ${S3_BUCKET:-ghostshopper-artifacts}
+    ports:
+      - '127.0.0.1:${MINIO_API_PORT:-19000}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-19001}:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  minio-init:
+    profiles: ['tools']
+    build:
+      context: .
+      dockerfile: minio.Dockerfile
+      target: mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ghostshopper_local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ghostshopper_local_only}
+      S3_BUCKET: ${S3_BUCKET:-ghostshopper-artifacts}
+    entrypoint: ['/bin/sh', '-ec']
+    command:
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$S3_BUCKET"
+        mc anonymous set none "local/$$S3_BUCKET"
+        mc stat "local/$$S3_BUCKET"
+    restart: 'no'
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:

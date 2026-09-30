@@ -1,0 +1,31 @@
+{
+  "name": "@ghostshopper/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:validate": "prisma validate",
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ghostshopper/domain": "workspace:*",
+    "@ghostshopper/application": "workspace:*",
+    "@prisma/client": "6.19.3",
+    "@ghostshopper/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "prisma": "6.19.3"
+  }
+}

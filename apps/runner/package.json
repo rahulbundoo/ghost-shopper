@@ -1,0 +1,23 @@
+{
+  "name": "@ghostshopper/runner",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ghostshopper/ai": "workspace:*",
+    "@ghostshopper/storage": "workspace:*",
+    "@ghostshopper/browser": "workspace:*",
+    "@ghostshopper/application": "workspace:*",
+    "@ghostshopper/config": "workspace:*",
+    "@ghostshopper/contracts": "workspace:*",
+    "@ghostshopper/database": "workspace:*",
+    "@ghostshopper/domain": "workspace:*",
+    "@ghostshopper/observability": "workspace:*",
+    "@ghostshopper/queue": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node --env-file-if-exists=../../.env dist/index.js"
+  }
+}

@@ -1,0 +1,31 @@
+# Run pnpm shopify app config link to link a development app, then retain these settings.
+client_id = ""
+name = "GhostShopper"
+application_url = "https://example.invalid"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[access_scopes]
+# Shop identity is readable without product/customer/order access.
+scopes = ""
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = ["https://example.invalid/auth/callback"]
+
+[webhooks]
+api_version = "2026-07"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
+
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes-update"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "/webhooks/privacy"

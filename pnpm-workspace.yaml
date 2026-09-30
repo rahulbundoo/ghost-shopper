@@ -1,0 +1,17 @@
+packages:
+  - apps/*
+  - packages/*
+
+strictPeerDependencies: true
+
+# Prisma 6's config loader uses deepmerge's unchanged plain-object API.
+# Remove once the official Shopify adapter supports a patched Prisma major.
+overrides:
+  '@prisma/config>deepmerge-ts': 8.0.0
+
+# pnpm 10 blocks dependency lifecycle scripts unless explicitly allowed.
+allowBuilds:
+  esbuild: true
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true

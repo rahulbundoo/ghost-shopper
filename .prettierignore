@@ -1,0 +1,10 @@
+AGENT.md
+pnpm-lock.yaml
+node_modules/
+dist/
+build/
+.react-router/
+.shopify/
+coverage/
+.idea/
+.git/

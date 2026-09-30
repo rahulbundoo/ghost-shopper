@@ -1,0 +1,26 @@
+{
+  "name": "@ghostshopper/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI provider adapters and versioned prompts (Phase 8).",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@ghostshopper/application": "workspace:*",
+    "@ghostshopper/contracts": "workspace:*",
+    "@ghostshopper/domain": "workspace:*",
+    "zod": "4.6.5"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

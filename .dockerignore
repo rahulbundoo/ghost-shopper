@@ -1,0 +1,13 @@
+.git
+.idea
+node_modules
+**/node_modules
+**/dist
+**/build
+**/.react-router
+**/.shopify
+coverage
+.env
+.env.*
+!.env.example
+*.log

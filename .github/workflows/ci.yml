@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:packages
+      - run: pnpm run lint
+      - run: pnpm run format:check
+      - run: pnpm run typecheck
+      - run: pnpm run test:unit
+      - name: Install headless Chromium for browser fixtures
+        run: pnpm exec playwright install --with-deps chromium --only-shell
+      - run: pnpm run test:browser
+      - name: Build all packages and test compiled applications
+        run: pnpm run test:integration
+      - run: pnpm run security:check
+      - run: pnpm run infra:config
+      - run: pnpm run infra:up
+      - run: pnpm run test:infra
+      - name: Verify private evidence storage against disposable CI MinIO
+        run: pnpm run test:storage
+        env:
+          TEST_S3_ENDPOINT: http://127.0.0.1:19000
+          TEST_S3_REGION: us-east-1
+          TEST_S3_BUCKET: ghostshopper-artifacts
+          TEST_S3_ACCESS_KEY_ID: ghostshopper_local
+          TEST_S3_SECRET_ACCESS_KEY: ghostshopper_local_only
+      - name: Apply schema to disposable CI PostgreSQL
+        run: pnpm run db:migrate
+        env:
+          DATABASE_URL: postgresql://ghostshopper:ghostshopper_local_only@127.0.0.1:15432/ghostshopper
+      - name: Verify database lifecycle and tenant isolation
+        run: pnpm run test:database
+        env:
+          TEST_DATABASE_URL: postgresql://ghostshopper:ghostshopper_local_only@127.0.0.1:15432/ghostshopper
+      - name: Verify asynchronous queue and runner integration
+        run: pnpm run test:queue
+        env:
+          TEST_DATABASE_URL: postgresql://ghostshopper:ghostshopper_local_only@127.0.0.1:15432/ghostshopper
+          TEST_REDIS_URL: redis://127.0.0.1:16379/1
+      - name: Infrastructure diagnostics
+        if: failure()
+        run: pnpm run infra:logs
+      - name: Stop CI infrastructure
+        if: always()
+        run: pnpm run infra:down
+
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        app: [web, runner]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build application image
+        run: docker build --file docker/Dockerfile --target ${{ matrix.app }} --tag ghostshopper-${{ matrix.app }}:ci .
+      - name: Smoke test application image
+        if: matrix.app == 'runner'
+        run: docker run --rm --network none ghostshopper-${{ matrix.app }}:ci node dist/index.js --check
+      - name: Smoke test web server image
+        if: matrix.app == 'web'
+        run: |
+          docker run -d --name web-smoke -p 127.0.0.1:3000:3000 ghostshopper-web:ci
+          trap 'docker logs web-smoke; docker rm -f web-smoke' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail http://127.0.0.1:3000/health; then exit 0; fi
+            sleep 1
+          done
+          exit 1
