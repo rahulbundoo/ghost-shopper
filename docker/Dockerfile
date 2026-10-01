@@ -13,7 +13,7 @@ WORKDIR /workspace/apps/web
 # Deployment image minimization is deferred to production hardening.
 COPY --from=build --chown=node:node /workspace /workspace
 USER node
-CMD ["node", "node_modules/@react-router/serve/bin.js", "build/server/index.js"]
+CMD ["node", "start.mjs"]
 
 FROM node:22-bookworm-slim AS runner
 ENV NODE_ENV=production

@@ -1,5 +1,5 @@
-// Structured logging, correlation and telemetry adapters.
-// Phase 3 structured logging; telemetry exporters remain production hardening.
+import type { createSentryReporter } from './sentry.js';
+export { createSentryReporter } from './sentry.js';
 export interface LogEvent {
   level: 'info' | 'warn' | 'error';
   event: string;
@@ -10,10 +10,12 @@ export interface LogEvent {
   attempt?: number;
   durationMs?: number;
   code?: string;
+  requestId?: string;
 }
 export function createLogger(
   service: 'web' | 'runner',
   sink: (line: string) => void = (line) => console.info(line),
+  report?: ReturnType<typeof createSentryReporter>,
 ) {
   return (event: LogEvent): void => {
     // Explicit allowlist: no free-form exception, token, URL or request payload logging.
@@ -30,7 +32,10 @@ export function createLogger(
         attempt: event.attempt,
         durationMs: event.durationMs,
         code: event.code,
+        requestId: event.requestId,
       }),
     );
+    if (report && event.level !== 'info')
+      void report({ service, event: event.event, ...(event.code ? { code: event.code } : {}) });
   };
 }

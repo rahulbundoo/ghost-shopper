@@ -83,7 +83,7 @@ jobs:
       - name: Smoke test web server image
         if: matrix.app == 'web'
         run: |
-          docker run -d --name web-smoke -p 127.0.0.1:3000:3000 ghostshopper-web:ci
+          docker run -d --name web-smoke -e DEPLOYMENT_ENV=local -p 127.0.0.1:3000:3000 ghostshopper-web:ci
           trap 'docker logs web-smoke; docker rm -f web-smoke' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail http://127.0.0.1:3000/health; then exit 0; fi

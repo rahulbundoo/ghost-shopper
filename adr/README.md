@@ -19,5 +19,8 @@ See also [0011 Private evidence lifecycle](0011-private-evidence-lifecycle.md) (
 See also [0012 Deterministic technical analysis](0012-deterministic-technical-analysis.md) (Accepted).
 See also [0013 Atomic incident lifecycle](0013-atomic-incident-lifecycle.md) (Accepted).
 See also [0014 Optional AI analysis](0014-optional-ai-analysis.md) (Accepted).
+See also [0015 Durable scheduling and incident emails](0015-durable-scheduling-alerts.md) (Accepted).
+See also [0016 Shopify subscriptions and atomic run allowances](0016-billing-admission.md) (Accepted).
+See also [0017 Production safeguards and operational acceptance](0017-production-hardening.md) (Accepted).
 
 Use [the template](template.md) for new decisions. Do not silently rewrite accepted decisions.

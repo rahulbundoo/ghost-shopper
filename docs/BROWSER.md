@@ -1,5 +1,7 @@
 # Browser journey engine (Phase 4)
 
+Phase 12 adds per-run proxy connection/transfer budgets and defaults native trace capture off. These controls do not bound decompressed resource memory or replace sandbox/egress isolation. See [deployment limits](HARDENING.md).
+
 The runner executes PURCHASE_JOURNEY with Playwright 1.63.0. Web never launches a browser. The engine emits seven ordered ActionResult records and persists each through the active run lease. A storefront failure returns a failed step and remaining steps SKIPPED; browser startup or infrastructure failure returns ERROR. Phase 5 captures evidence, Phase 6 adds deterministic findings, and Phase 7 reconciles incidents at run completion. No AI is implemented; incident persistence remains outside the browser package.
 
 ## Docker-free local use

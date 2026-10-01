@@ -7,6 +7,7 @@ import { ValidationError } from '../../packages/contracts/src/index.js';
 
 function fixture() {
   const repositories = {
+    notifications: { get: vi.fn(), update: vi.fn(), history: vi.fn() },
     incidents: { list: vi.fn(), get: vi.fn(), occurrences: vi.fn() },
     analyses: { list: vi.fn() },
     aiAnalyses: { list: vi.fn() },

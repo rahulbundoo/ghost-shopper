@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@ghostshopper/application": "workspace:*"
+  },
   "description": "Email delivery adapters (Phase 10).",
   "exports": {
     ".": {

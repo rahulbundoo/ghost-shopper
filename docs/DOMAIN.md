@@ -1,5 +1,7 @@
 # Domain
 
+Phase 11 adds infrastructure-free BillingPolicy, SubscriptionSnapshot and runAllowance rules. Trials are time- and run-limited; paid access requires a current period, matching test/live policy and fresh verification. Subscription and UsageRecord persistence belongs to database; BillingProvider/BillingRepository ports and billing orchestration belong to application. Browser outcomes do not determine subscription state or trigger additional charges. See [billing semantics](BILLING.md).
+
 ## Reserved terminology
 
 Shop, Monitor, Scenario, TestRun, RunStep, Finding, Incident and Artifact have the meanings defined in [AGENT.md](../AGENT.md). Merchant-owned entities require shopId; tenant context must come from server-side authentication.
@@ -23,3 +25,5 @@ Phase 6 adds Finding/RunAnalysis, eleven closed technical finding types, severit
 Phase 7 adds Incident/IncidentOccurrence, closed OPEN/RESOLVED states, configuration-scope identity, stable observation ordering and a conservative recovery predicate. Complete zero-finding passes can resolve incidents; other outcomes cannot. Repeated runs increment lifetime occurrence counts; recurrence reopens the same identity. Infrastructure locks, hashing and idempotent writes remain in the database adapter. See [incident semantics](INCIDENTS.md).
 
 Phase 8 adds JourneyAnalysisInput, JourneyAnalysis, ExperienceFinding, AiUsage and AiAnalysisRecord. Five closed experience types have code-owned noncritical severity rules. AI_ANALYSIS records carry a separate subjective score and never enter technical scoring or incident reconciliation. Provider names, version metadata and cost records are data, not infrastructure dependencies. Application owns provider/persistence ports; domain remains SDK/Node/Zod-free. See [AI analysis](AI.md).
+
+Phase 10 adds hourly/six-hourly/daily interval policy, significant-incident selection (HIGH/CRITICAL), notification settings/history and bounded email retry/cooldown constants. Infrastructure locks, lease tokens, HTTP and credentials stay outside domain. Only detected incident transitions produce email intent; AI remains independent. See [scheduling and alerts](AUTOMATION.md).

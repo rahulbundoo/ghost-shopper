@@ -62,7 +62,13 @@ export interface TestRun extends JourneyConfiguration {
   readonly attemptCount: number;
   readonly errorCode: string | null;
 }
-export type DomainErrorCode = 'SHOP_INACTIVE' | 'MONITOR_DISABLED' | 'NOT_FOUND' | 'CONFLICT';
+export type DomainErrorCode =
+  | 'SHOP_INACTIVE'
+  | 'MONITOR_DISABLED'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'BILLING_REQUIRED'
+  | 'RUN_LIMIT_REACHED';
 export class DomainError extends Error {
   constructor(readonly code: DomainErrorCode) {
     super(code);
@@ -86,3 +92,5 @@ export function snapshotMonitor(
   };
 }
 export * from './ai.js';
+export * from './automation.js';
+export * from './billing.js';

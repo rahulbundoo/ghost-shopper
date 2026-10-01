@@ -27,7 +27,10 @@ export class EvidenceCollector {
   private position: number | null = null;
   private startedAt = Date.now();
   private finished = false;
-  constructor(private readonly sink: EvidenceSink) {}
+  constructor(
+    private readonly sink: EvidenceSink,
+    private readonly traceEnabled = true,
+  ) {}
   get incomplete() {
     return this.errors.size > 0;
   }
@@ -78,6 +81,7 @@ export class EvidenceCollector {
     page.on('pageerror', this.onPageError);
     context.on('requestfailed', this.onRequestFailed);
     context.on('response', this.onResponse);
+    if (!this.traceEnabled) return;
     try {
       this.traceDirectory = await mkdtemp(join(tmpdir(), 'ghostshopper-evidence-'));
       // Operation timeline only; masked screenshots and redacted diagnostics supplement it.
@@ -135,6 +139,7 @@ export class EvidenceCollector {
     await this.stopTrace();
   }
   private stopTrace(): Promise<void> {
+    if (!this.traceEnabled) return Promise.resolve();
     this.traceStopped ??= (async () => {
       if (!this.context || !this.traceDirectory) {
         this.errors.add('TRACE_UNAVAILABLE');
@@ -179,7 +184,7 @@ export class EvidenceCollector {
           finishedAt: new Date().toISOString(),
           steps: this.steps,
           captureErrors: [...this.errors],
-          traceProfile: 'operations-only-sensitive',
+          traceProfile: this.traceEnabled ? 'operations-only-sensitive' : 'disabled',
           diagnosticText: 'omitted',
           truncated: { console: this.droppedConsole, network: this.droppedNetwork },
         }),

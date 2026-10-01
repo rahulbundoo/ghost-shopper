@@ -17,6 +17,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@ghostshopper/application": "workspace:*",
+    "@ghostshopper/domain": "workspace:*",
     "@ghostshopper/config": "workspace:*",
     "@ghostshopper/contracts": "workspace:*",
     "@ghostshopper/database": "workspace:*",

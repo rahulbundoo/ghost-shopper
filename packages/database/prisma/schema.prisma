@@ -9,20 +9,49 @@ datasource db {
 
 model Shop {
   // Canonical myshopify.com domain is the tenant ID; custom domains are display data only.
-  id            String    @id
-  shopifyId     String?   @unique
-  name          String?
-  storefrontUrl String?
-  currencyCode  String?
-  scopes        String    @default("")
-  installedAt   DateTime?
-  uninstalledAt DateTime?
-  syncedAt      DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  monitors      Monitor[]
-  runs          TestRun[]
+  id                  String               @id
+  shopifyId           String?              @unique
+  name                String?
+  storefrontUrl       String?
+  currencyCode        String?
+  scopes              String               @default("")
+  installedAt         DateTime?
+  uninstalledAt       DateTime?
+  syncedAt            DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  sessions            Session[]
+  monitors            Monitor[]
+  runs                TestRun[]
+  notificationChannel NotificationChannel?
+  emailDeliveries     EmailDelivery[]
+  subscription        Subscription?
+  usageRecords        UsageRecord[]
+}
+
+model RateLimitBucket {
+  key         String   @id @db.VarChar(64)
+  windowStart DateTime
+  count       Int
+
+  @@index([windowStart])
+}
+
+// Deliberately independent of tenant FKs so deletion intent survives privacy erasure.
+model ArtifactDeletion {
+  storageKey     String    @id
+  nextAttemptAt  DateTime
+  leaseToken     String?   @db.Uuid
+  leaseExpiresAt DateTime?
+  attempts       Int       @default(0)
+  lastError      String?   @db.VarChar(40)
+
+  @@index([nextAttemptAt])
+}
+
+model ServiceHeartbeat {
+  id        String   @id @db.VarChar(64)
+  updatedAt DateTime
 }
 
 enum Scenario {
@@ -70,6 +99,7 @@ model Monitor {
   frequency      MonitorFrequency @default(DAILY)
   enabled        Boolean          @default(true)
   version        Int              @default(1)
+  nextRunAt      DateTime         @default(now())
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   runs           TestRun[]
@@ -77,6 +107,7 @@ model Monitor {
 
   @@unique([shopId, id])
   @@index([shopId, createdAt, id])
+  @@index([enabled, nextRunAt, id])
 }
 
 model TestRun {
@@ -110,11 +141,51 @@ model TestRun {
   incidentOccurrences IncidentOccurrence[]
   lastSeenIncidents   Incident[]           @relation("IncidentLastRun")
   resolvedIncidents   Incident[]           @relation("IncidentResolvedRun")
+  emailDeliveries     EmailDelivery[]
+  usageRecord         UsageRecord?
 
   @@unique([shopId, id])
   @@index([shopId, createdAt, id])
   @@index([shopId, monitorId, createdAt, id])
   @@index([dispatchRequested, status, nextDispatchAt])
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  INACTIVE
+}
+
+model Subscription {
+  shopId            String             @id
+  shop              Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  status            SubscriptionStatus @default(TRIAL)
+  trialEndsAt       DateTime
+  everPaid          Boolean            @default(false)
+  providerId        String?
+  policyKey         String?
+  periodEnd         DateTime?
+  verifiedAt        DateTime?
+  syncStartedAt     DateTime?
+  nextSyncAt        DateTime           @default(now())
+  checkoutToken     String?            @db.Uuid
+  checkoutExpiresAt DateTime?
+  approvalUrl       String?
+
+  @@index([nextSyncAt])
+}
+
+model UsageRecord {
+  id        String   @id @default(uuid()) @db.Uuid
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  runId     String   @db.Uuid
+  run       TestRun  @relation(fields: [shopId, runId], references: [shopId, id], onDelete: Cascade)
+  periodKey String   @db.VarChar(64)
+  createdAt DateTime @default(now())
+
+  @@unique([shopId, runId])
+  @@index([shopId, periodKey])
 }
 
 enum JourneyActionName {
@@ -322,13 +393,14 @@ model Finding {
 
 model IncidentScope {
   shopId                String
-  monitorId             String     @db.Uuid
-  configKey             String     @db.VarChar(64)
-  monitor               Monitor    @relation(fields: [shopId, monitorId], references: [shopId, id], onDelete: Cascade)
+  monitorId             String          @db.Uuid
+  configKey             String          @db.VarChar(64)
+  monitor               Monitor         @relation(fields: [shopId, monitorId], references: [shopId, id], onDelete: Cascade)
   lastCleanRunCreatedAt DateTime?
-  lastCleanRunId        String?    @db.Uuid
+  lastCleanRunId        String?         @db.Uuid
   lastCleanCompletedAt  DateTime?
   incidents             Incident[]
+  emailDeliveries       EmailDelivery[]
 
   @@id([shopId, monitorId, configKey])
 }
@@ -407,4 +479,53 @@ model Session {
   refreshTokenExpires DateTime?
 
   @@index([shop])
+}
+
+model NotificationChannel {
+  shopId          String   @id
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  email           String   @db.VarChar(254)
+  enabled         Boolean  @default(false)
+  recoveryEnabled Boolean  @default(true)
+  version         Int      @default(1)
+  nextSendAt      DateTime @default(now())
+}
+
+enum EmailKind {
+  FAILURE
+  RECOVERY
+}
+
+enum EmailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model EmailDelivery {
+  id             String        @id @default(uuid()) @db.Uuid
+  shopId         String
+  shop           Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  runId          String        @db.Uuid
+  run            TestRun       @relation(fields: [shopId, runId], references: [shopId, id], onDelete: Cascade)
+  monitorId      String        @db.Uuid
+  configKey      String        @db.VarChar(64)
+  scope          IncidentScope @relation(fields: [shopId, monitorId, configKey], references: [shopId, monitorId, configKey], onDelete: Cascade)
+  kind           EmailKind
+  recipient      String        @db.VarChar(254)
+  channelVersion Int
+  status         EmailStatus   @default(PENDING)
+  attemptCount   Int           @default(0)
+  createdAt      DateTime      @default(now())
+  firstAttemptAt DateTime?
+  nextAttemptAt  DateTime      @default(now())
+  leaseToken     String?       @db.Uuid
+  leaseExpiresAt DateTime?
+  finishedAt     DateTime?
+
+  @@unique([shopId, runId, kind])
+  @@index([status, nextAttemptAt])
+  @@index([shopId, monitorId, configKey, kind, status])
 }

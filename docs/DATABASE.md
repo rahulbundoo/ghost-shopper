@@ -1,5 +1,7 @@
 # Database
 
+Phase 12 adds migration eleven, `202610010011_production_hardening`: shared RateLimitBucket counters, ServiceHeartbeat rows and ArtifactDeletion intents backfilled from existing artifacts. Deletion intents intentionally have no tenant foreign key so object cleanup survives shop-redaction cascades. Treat their keys as sensitive metadata. Review [upgrade, encryption migration and recovery](HARDENING.md) before applying this migration; active data must not be reset.
+
 Phase 1 uses PostgreSQL and Prisma 6.19.3, matching the official Shopify session adapter's supported peer range. The reviewed initial migration is in `packages/database/prisma/migrations`.
 
 Shop's primary key is the canonical myshopify.com domain; custom storefront domains are metadata, never tenant selectors. Shop also stores the Shopify GID, display name, currency, scopes and installation/synchronization timestamps.
@@ -10,7 +12,7 @@ ShopRepository accepts authenticated domains and scopes all lifecycle mutations.
 
 Run `pnpm db:migrate` with an explicit DATABASE_URL from the root .env. No fallback database, schema push, reset or automatic destructive startup migration exists. For tests, migrate a separate disposable database and set TEST_DATABASE_URL before `pnpm test:database`.
 
-Tokens are server-side secrets; database access and backups must be restricted and encrypted at rest by the deployment environment. Application-level token encryption, backup/restore and retention operations remain production-hardening work.
+Tokens are server-side secrets; database access and backups must be restricted and encrypted at rest by the deployment environment. Phase 12 adds application-level token encryption, backup/restore tooling and retention maintenance. Deployment configuration and restore verification remain operator responsibilities; see [the hardening runbook](HARDENING.md).
 
 ## Phase 2 monitoring persistence
 
@@ -59,3 +61,13 @@ Migration `202609300007_incidents` adds IncidentScope, Incident and IncidentOccu
 Migration `202609300008_ai_analysis` adds AiAnalysis with a tenant/run compound foreign key, unique tenant/run/attempt reservation, status/expiry index and SQL checks for state/result consistency and nonnegative cost/latency. A reservation requires a completed current-attempt run, active installation and READY unexpired screenshot metadata. Provider calls happen outside all database transactions and after deterministic completion. Finalization requires matching tenant/run/attempt, RUNNING status and unexpired deadline; it cannot overwrite a terminal AI result. Interrupted requests expire without replay.
 
 Only validated result/usage JSON and decimal USD estimates are stored, with input hash, evidence steps and version/model/pricing metadata. No screenshots, raw prompts or raw provider responses enter PostgreSQL. Active-tenant reads expose separate AI_ANALYSIS records; redaction cascades them. No existing run is backfilled. See [AI behavior](AI.md).
+
+## Phase 11 billing persistence
+
+Phase 11 migration `202609300010_billing_foundation` adds Subscription (tenant key, persisted trial, provider period, verification and checkout reservation) and UsageRecord (unique tenant/run, compound tenant run FK, period index). The subscription lock serializes manual and scheduled admission; run, usage and dispatch intent commit together. Uninstall clears entitlement but preserves trial history; privacy redaction cascades both models. No usage backfill is performed. Active-period usage must not be deleted by retention jobs. See [billing accounting](BILLING.md).
+
+## Phase 10 scheduling and notification persistence
+
+Migration `202609300009_scheduling_alerts` adds indexed Monitor.nextRunAt, tenant-owned NotificationChannel and EmailDelivery. Existing monitors receive a due time but remain inert unless the scheduler deployment flag is enabled. Delivery uniqueness is tenant/run/kind; compound foreign keys bind the run and incident scope to the tenant. SQL checks bound attempts and lease state. The settings version prevents stale updates, and changing settings cancels pending delivery records. Recipient snapshots are internal; public history omits addresses and lease tokens.
+
+Due monitor scans lock with SKIP LOCKED and commit queued run plus next due time together. Manual creation uses the same monitor lock and rejects active overlap. Incident transitions and email intent commit together; provider calls occur only after commit, outside transactions. Uninstall disables monitors and channels and cancels pending messages; redaction cascades records. Apply all nine migrations before starting these builds. Real concurrency tests require dedicated PostgreSQL. See [automation](AUTOMATION.md).

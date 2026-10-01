@@ -12,7 +12,39 @@ The separate Phase 0 `test:infra` suite checks optional Docker PostgreSQL/Redis/
 
 Phase 4 adds browser journey fixtures. Never complete real purchases in tests.
 
-## Phase 8 checks
+## Phase 12 checks
+
+Local verification passed shared-package and application builds, typed linting, formatting, strict TypeScript, 370 unit tests, 39 integration tests and all 28 installed-Chrome tests. The dependency audit reported no known vulnerabilities. The `pnpm check` stages were rerun individually after correcting test-fixture types; no claim of a final uninterrupted aggregate run is made. No Docker, browser download, live Sentry/email/billing request, backup restore or session rotation was used. The in-app browser connection was unavailable; browser acceptance used the existing Chrome fixture suite.
+
+New tests cover session encryption/tampering/tenant binding, deployment gates, atomic rate-limit query construction and 429 responses, readiness authentication/heartbeat/database failures, bounded deletion and lease fencing, disabled traces, telemetry redaction/concurrency, signed storage deletion and safe operator-command rejection. Integration tests start the compiled preflight-enabled Node server and reject unauthenticated readiness requests.
+
+Dedicated PostgreSQL tests add shared-limit concurrency, encrypted official-adapter round trips, redaction-surviving deletion intents and competing deletion claims. They require TEST_DATABASE_URL and all eleven migrations and remain unverified locally. Real PostgreSQL/Redis/S3 behavior, versioned-object purge, key rotation, backup restoration and deployment isolation must pass [external-testing acceptance](HARDENING.md) before inviting merchants.
+
+## Phase 11 checks
+
+Local verification passed `pnpm check` (builds, lint, formatting, types and 34 integration tests), followed by the final 340-test unit run and targeted type/lint checks after the cancellation-race regression was added. All 28 installed-Chrome tests passed, including two billing UI scenarios. No Docker, browser download, live billing call or real charge was used. The in-app browser connection was unavailable, so UI verification used the repository's Chrome fixture suite.
+
+Billing tests cover deployment opt-in, price validation, trial expiry, paid verification freshness, test/live policy separation, atomic admission predicates, stale synchronization, checkout reservation, authenticated API access, server-owned prices/IDs and provider failures. Browser fixtures cover exhausted allowances, explicit approval links and cancellation acknowledgement without contacting Shopify. Production HTTP tests protect both new billing routes. No live charge is created.
+
+The PostgreSQL suite adds last-unit concurrency across monitors, scheduler limits, rollback, compound tenant/unique constraints, renewal, checkout reservations and uninstall/redaction. It requires TEST_DATABASE_URL with all ten migrations and remains unverified locally without that database. See [billing acceptance](BILLING.md).
+
+## Phase 10 checks
+
+Local verification passed `pnpm check`: lint, formatting, strict types, builds, 310 unit tests and 31 integration tests. All 26 installed-Chrome browser tests also passed, including the notification settings scenario. No Docker, browser download or live email was used.
+
+Unit tests cover scheduler cadence/locking/overlap suppression, opt-in schemas, tenant API access, incident email grouping, cooldown, lease fencing, recipient/configuration changes, obsolete/expired work and provider failure classification. Resend is stubbed: no real messages or provider charges occur. The browser fixture verifies explicit notification consent and recovery preference submission with a mocked API. Production HTTP tests reject forged access to settings and notification APIs. Full checks remain Docker-free.
+
+The dedicated PostgreSQL suite adds concurrent scheduling/manual triggers, downtime behavior, settings conflicts, compound tenant foreign keys, competing delivery claims, cancellation and redaction. Apply all nine migrations. These tests require TEST_DATABASE_URL and are not proven by mocked query tests. Database files now run sequentially because scheduler tests scan all eligible monitors. Live scheduled storefront checks and actual failure/recovery mailbox delivery still require authorized credentials and the checklist in [automation acceptance](AUTOMATION.md).
+
+## Phase 9 checks (merchant UI)
+
+Local Phase 9 verification passed `pnpm check` (277 unit tests, 29 integration tests, builds, lint, formatting and type checks) and 25 installed-Chrome browser tests, including six merchant UI scenarios. Chrome DevTools verified real Polaris overview/run-detail rendering and attempt switching, with no horizontal overflow at the inspected narrow viewport. No Docker or browser download was used. This is fixture acceptance, not live Shopify/S3 acceptance.
+
+Merchant UI unit tests cover authenticated tenant binding, status/error mapping, no-store loader data, bounded pagination, conservative health labels, evidence expiry, same-origin API requests and no automatic mutation retries. Production HTTP tests reject forged credentials on all new merchant screens.
+
+`BROWSER_CHANNEL=chrome pnpm test:browser` (set the environment variable separately in PowerShell) uses installed Chrome without Docker or downloads. The merchant UI suite starts its own synthetic Vite harness on loopback port 4180, stubs API responses, blocks the external Polaris CDN, and tests native form validation, create/edit conflict handling, disabled/version payloads, attempt isolation, lazy evidence errors and Run now navigation. Live Polaris appearance is checked separately with Chrome DevTools against port 4179. These fixtures do not establish Shopify embedding, authenticated service integration or live S3 rendering; see [acceptance requirements](MERCHANT_UI.md).
+
+## Phase 8 checks (AI)
 
 Unit tests cover closed schemas, score/confidence/size bounds, rule-owned severity, screenshot references, minimal inputs, opt-in configuration, token-cost calculation, refusals/incomplete/malformed output, aborts, duplicate suppression, failure isolation, persistence predicates and tenant-authorized reads. A controlled HTTP server exercises actual fetch request/response bytes and redirect rejection with fixture credentials; no paid API is called. `pnpm check` still runs without Docker or external services.
 

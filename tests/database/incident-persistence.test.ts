@@ -8,7 +8,11 @@ import {
   ShopRepository,
 } from '../../packages/database/src/index.js';
 import { MonitoringService } from '../../packages/application/src/index.js';
-import { JOURNEY_ACTIONS, type ActionResult } from '../../packages/domain/src/index.js';
+import {
+  JOURNEY_ACTIONS,
+  snapshotMonitor,
+  type ActionResult,
+} from '../../packages/domain/src/index.js';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url) throw new Error('TEST_DATABASE_URL must select a dedicated migrated database.');
@@ -42,7 +46,11 @@ async function prepare(
   kind: 'failed' | 'clean' | 'incomplete' | 'warning',
   order: number,
 ) {
-  const run = await service.createTestRun({ monitorId });
+  // Model historical overlapping deliveries directly: the current manual API prevents new overlaps.
+  const configuration = await db.monitor.findUniqueOrThrow({ where: { id: monitorId } });
+  const run = await db.testRun.create({
+    data: { ...snapshotMonitor(configuration), shopId, monitorId, dispatchRequested: true },
+  });
   await db.testRun.update({
     where: { id: run.id },
     data: { createdAt: new Date(1700000000000 + order * 1000) },

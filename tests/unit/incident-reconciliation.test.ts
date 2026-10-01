@@ -24,6 +24,8 @@ const finding = {
 };
 function fixture() {
   const tx = {
+    notificationChannel: { findFirst: vi.fn().mockResolvedValue(null) },
+    emailDelivery: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
     runAnalysis: {
       findUnique: vi.fn().mockResolvedValue({
         complete: true,
@@ -41,6 +43,7 @@ function fixture() {
       update: vi.fn().mockResolvedValue({}),
     },
     incident: {
+      count: vi.fn().mockResolvedValue(0),
       upsert: vi.fn().mockResolvedValue({
         id: 'incident',
         occurrenceCount: 0,
@@ -58,6 +61,63 @@ function fixture() {
   };
 }
 describe('incident reconciliation queries', () => {
+  it('records one failure intent for an opted-in shop, not another for repeated findings', async () => {
+    const f = fixture();
+    f.tx.notificationChannel.findFirst.mockResolvedValue({
+      email: 'owner@example.com',
+      version: 2,
+    });
+    await f.reconcile();
+    expect(f.tx.emailDelivery.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          shopId: run.shopId,
+          runId: run.id,
+          kind: 'FAILURE',
+          channelVersion: 2,
+        }),
+      ],
+      skipDuplicates: true,
+    });
+    f.tx.emailDelivery.createMany.mockClear();
+    f.tx.incident.upsert.mockResolvedValue({
+      id: 'incident',
+      occurrenceCount: 3,
+      status: 'OPEN',
+      lastSeenRunId: 'previous',
+      lastSeenRunCreatedAt: new Date(50),
+    });
+    await f.reconcile();
+    expect(f.tx.emailDelivery.createMany).not.toHaveBeenCalled();
+  });
+  it('records recovery intent only when a significant incident actually resolves', async () => {
+    const f = fixture();
+    f.tx.notificationChannel.findFirst.mockResolvedValue({
+      email: 'owner@example.com',
+      version: 1,
+    });
+    f.tx.incident.count.mockResolvedValue(1);
+    f.tx.runAnalysis.findUnique.mockResolvedValue({
+      complete: true,
+      outcome: 'PASSED',
+      rulesVersion: 'technical-v1',
+      findings: [],
+    });
+    await f.reconcile({ ...run, outcome: 'PASSED' });
+    expect(f.tx.emailDelivery.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ kind: 'RECOVERY' })],
+      skipDuplicates: true,
+    });
+    expect(f.tx.notificationChannel.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          recoveryEnabled: true,
+          shopId: run.shopId,
+          enabled: true,
+        }) as unknown,
+      }),
+    );
+  });
   it('opens a finding incident and counts a distinct run rather than raw diagnostic events', async () => {
     const f = fixture();
     await f.reconcile();

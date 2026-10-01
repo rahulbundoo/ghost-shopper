@@ -73,6 +73,14 @@ export class BullRunPublisher implements RunPublisher {
   async close(): Promise<void> {
     await this.queue.close();
   }
+  async healthy(): Promise<boolean> {
+    try {
+      await this.queue.getJobCounts('waiting');
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export function createRunWorker(

@@ -25,24 +25,21 @@ async function freePort(): Promise<number> {
 beforeAll(async () => {
   const port = await freePort();
   baseUrl = `http://127.0.0.1:${port}`;
-  processUnderTest = spawn(
-    process.execPath,
-    ['node_modules/@react-router/serve/bin.js', 'build/server/index.js'],
-    {
-      cwd: resolve('apps/web'),
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        NODE_ENV: 'production',
-        HOST: '127.0.0.1',
-        PORT: String(port),
-        SHOPIFY_API_KEY: 'test-client-id',
-        SHOPIFY_API_SECRET: 'test-api-secret',
-        SHOPIFY_APP_URL: 'https://ghostshopper.example',
-        DATABASE_URL: 'postgresql://unused:unused@127.0.0.1:1/unused',
-      },
+  processUnderTest = spawn(process.execPath, ['start.mjs'], {
+    cwd: resolve('apps/web'),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      DEPLOYMENT_ENV: 'local',
+      HOST: '127.0.0.1',
+      PORT: String(port),
+      SHOPIFY_API_KEY: 'test-client-id',
+      SHOPIFY_API_SECRET: 'test-api-secret',
+      SHOPIFY_APP_URL: 'https://ghostshopper.example',
+      DATABASE_URL: 'postgresql://unused:unused@127.0.0.1:1/unused',
     },
-  );
+  });
   processUnderTest.stdout?.on('data', (chunk: Buffer) => {
     output += chunk.toString();
   });
@@ -69,7 +66,37 @@ afterAll(() => {
   processUnderTest?.kill();
 });
 describe('production Shopify shell HTTP boundaries', () => {
+  it('does not reveal readiness or accept a query-string health credential', async () => {
+    const response = await fetch(baseUrl + '/ready?token=forged');
+    expect(response.status).toBe(404);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
   it.each([
+    '/app/settings',
+    '/app/billing',
+    '/app/monitors',
+    '/app/monitors/new',
+    '/app/monitors/ce42d97b-795d-42f8-b126-62b00d7c18dd',
+    '/app/runs',
+    '/app/runs/ce42d97b-795d-42f8-b126-62b00d7c18dd',
+    '/app/incidents',
+    '/app/incidents/ce42d97b-795d-42f8-b126-62b00d7c18dd',
+  ])('protects merchant screen %s with forged credentials', async (path) => {
+    const response = await fetch(baseUrl + path + '?shop=other.myshopify.com', {
+      redirect: 'manual',
+      headers: {
+        Authorization: 'Bearer forged-session-token',
+        'User-Agent': 'Mozilla/5.0 Chrome/140.0.0.0 Safari/537.36',
+      },
+    });
+    expect([302, 400, 401]).toContain(response.status);
+    const body = await response.text();
+    expect(body).not.toContain('postgresql://');
+    expect(body).not.toContain('test-api-secret');
+  });
+  it.each([
+    '/app/api/notifications',
+    '/app/api/billing',
     '/app/api/shop',
     '/app/api/monitors',
     '/app/api/monitors/ce42d97b-795d-42f8-b126-62b00d7c18dd',
@@ -84,7 +111,7 @@ describe('production Shopify shell HTTP boundaries', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
     expect(await response.json()).toEqual({ error: { code: 'UNAUTHORIZED' } });
   });
-  it.each(['/app/api/monitors', '/app/api/runs'])(
+  it.each(['/app/api/monitors', '/app/api/runs', '/app/api/billing'])(
     'rejects unauthenticated writes to %s',
     async (path) => {
       const response = await fetch(baseUrl + path, {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export * from './hardening.js';
 
 const appUrlSchema = z.url().refine((value) => {
   const url = new URL(value);
@@ -54,6 +55,61 @@ export function readShopifyConfig(environment: Record<string, string | undefined
   };
 }
 export type ShopifyConfig = ReturnType<typeof readShopifyConfig>;
+
+export function readBillingConfig(environment: Record<string, string | undefined>) {
+  if (environment['BILLING_ENABLED'] === undefined || environment['BILLING_ENABLED'] === 'false')
+    return null;
+  if (environment['BILLING_ENABLED'] !== 'true') throw new ConfigurationError(['BILLING_ENABLED']);
+  const result = z
+    .object({
+      BILLING_PRICE_USD: z
+        .string()
+        .regex(/^(?:0|[1-9]\d{0,3})\.\d{2}$/)
+        .refine((value) => Number(value) > 0),
+      BILLING_PAID_RUN_LIMIT: z.coerce.number().int().min(1).max(100000),
+      BILLING_TRIAL_DAYS: z.coerce.number().int().min(1).max(30).default(14),
+      BILLING_TRIAL_RUN_LIMIT: z.coerce.number().int().min(1).max(10000).default(100),
+      BILLING_TEST: z.enum(['true', 'false']).default('true'),
+    })
+    .safeParse(environment);
+  if (!result.success)
+    throw new ConfigurationError(result.error.issues.map((issue) => String(issue.path[0])));
+  return {
+    priceUsd: result.data.BILLING_PRICE_USD,
+    paidRunLimit: result.data.BILLING_PAID_RUN_LIMIT,
+    trialDays: result.data.BILLING_TRIAL_DAYS,
+    trialRunLimit: result.data.BILLING_TRIAL_RUN_LIMIT,
+    test: result.data.BILLING_TEST === 'true',
+  };
+}
+
+export function readAutomationConfig(environment: Record<string, string | undefined>) {
+  const enabled = z
+    .enum(['true', 'false'])
+    .default('false')
+    .safeParse(environment['SCHEDULER_ENABLED']);
+  if (!enabled.success) throw new ConfigurationError(['SCHEDULER_ENABLED']);
+  return { schedulerEnabled: enabled.data === 'true' };
+}
+export function readEmailConfig(environment: Record<string, string | undefined>) {
+  if (environment['EMAIL_ENABLED'] === undefined || environment['EMAIL_ENABLED'] === 'false')
+    return null;
+  if (environment['EMAIL_ENABLED'] !== 'true') throw new ConfigurationError(['EMAIL_ENABLED']);
+  const result = z
+    .object({
+      RESEND_API_KEY: z.string().trim().min(1),
+      EMAIL_FROM: z.string().email().max(254),
+      SHOPIFY_APP_URL: appUrlSchema,
+    })
+    .safeParse(environment);
+  if (!result.success)
+    throw new ConfigurationError(result.error.issues.map((issue) => String(issue.path[0])));
+  return {
+    apiKey: result.data.RESEND_API_KEY,
+    from: result.data.EMAIL_FROM,
+    appUrl: new URL(result.data.SHOPIFY_APP_URL).origin,
+  };
+}
 
 const aiSchema = z.object({
   OPENAI_API_KEY: z.string().trim().min(1),

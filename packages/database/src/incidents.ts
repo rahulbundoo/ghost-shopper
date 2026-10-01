@@ -4,7 +4,9 @@ import {
   canResolveIncidents,
   incidentScopeIdentity,
   isLaterObservation,
+  significantIncident,
 } from '@ghostshopper/domain';
+import { queueIncidentEmail } from './automation.js';
 
 /** Caller must hold the monitor lock and complete the run in this same transaction. */
 export async function reconcileIncidents(tx: Prisma.TransactionClient, run: TestRun) {
@@ -32,6 +34,7 @@ export async function reconcileIncidents(tx: Prisma.TransactionClient, run: Test
       ? { createdAt: scope.lastCleanRunCreatedAt, id: scope.lastCleanRunId }
       : null;
   const now = new Date();
+  let openedSignificant = false;
   if (canResolveIncidents(analysis) && isLaterObservation(order, cleanOrder)) {
     await tx.incidentScope.update({
       where: { shopId_monitorId_configKey: scopeKey },
@@ -42,6 +45,17 @@ export async function reconcileIncidents(tx: Prisma.TransactionClient, run: Test
       },
     });
     // An older successful run cannot resolve a newer observed failure.
+    const recoveredSignificant = await tx.incident.count({
+      where: {
+        ...scopeKey,
+        status: 'OPEN',
+        severity: { in: ['HIGH', 'CRITICAL'] },
+        OR: [
+          { lastSeenRunCreatedAt: { lt: run.createdAt } },
+          { lastSeenRunCreatedAt: run.createdAt, lastSeenRunId: { lt: run.id } },
+        ],
+      },
+    });
     await tx.incident.updateMany({
       where: {
         ...scopeKey,
@@ -53,6 +67,7 @@ export async function reconcileIncidents(tx: Prisma.TransactionClient, run: Test
       },
       data: { status: 'RESOLVED', resolvedAt: now, resolvedRunId: run.id },
     });
+    if (recoveredSignificant > 0) await queueIncidentEmail(tx, run, configKey, 'RECOVERY');
   }
   for (const finding of analysis.findings) {
     const key = { ...scopeKey, fingerprint: finding.fingerprint };
@@ -93,6 +108,13 @@ export async function reconcileIncidents(tx: Prisma.TransactionClient, run: Test
         createdAt: incident.lastSeenRunCreatedAt,
         id: incident.lastSeenRunId,
       }) || incident.occurrenceCount === 0;
+    if (
+      latest &&
+      !recovered &&
+      significantIncident(finding.severity) &&
+      (incident.occurrenceCount === 0 || incident.status === 'RESOLVED')
+    )
+      openedSignificant = true;
     await tx.incident.update({
       where: { shopId_id: { shopId: run.shopId, id: incident.id } },
       data: {
@@ -113,4 +135,5 @@ export async function reconcileIncidents(tx: Prisma.TransactionClient, run: Test
       },
     });
   }
+  if (openedSignificant) await queueIncidentEmail(tx, run, configKey, 'FAILURE');
 }

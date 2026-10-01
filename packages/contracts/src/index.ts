@@ -28,3 +28,5 @@ export const shopQueryResultSchema = z.object({
 });
 export const scopesUpdateSchema = z.object({ current: z.array(z.string()) });
 export * from './ai.js';
+export * from './notifications.js';
+export * from './billing.js';

@@ -9,6 +9,8 @@ import type {
   AiAnalysisRecord,
   Incident,
   IncidentOccurrence,
+  NotificationSettings,
+  EmailHistory,
 } from '@ghostshopper/domain';
 export * from './run-processing.js';
 export * from './artifacts.js';
@@ -27,10 +29,17 @@ import {
   type UpdateMonitorInput,
   type Pagination,
   type ListTestRunsInput,
+  notificationSettingsSchema,
+  type UpdateNotificationSettings,
 } from '@ghostshopper/contracts';
 
 // Implementations are bound to one server-authenticated tenant. No operation accepts shopId.
 export interface TenantRepositories {
+  readonly notifications: {
+    history(): Promise<EmailHistory[]>;
+    get(): Promise<NotificationSettings | null>;
+    update(input: UpdateNotificationSettings): Promise<NotificationSettings>;
+  };
   readonly aiAnalyses: { list(runId: string): Promise<AiAnalysisRecord[]> };
   readonly incidents: {
     list(input: ListIncidentsInput): Promise<Incident[]>;
@@ -58,6 +67,15 @@ export interface TenantRepositories {
 }
 export class MonitoringService {
   constructor(private readonly repositories: TenantRepositories) {}
+  getNotificationSettings() {
+    return this.repositories.notifications.get();
+  }
+  listEmailHistory() {
+    return this.repositories.notifications.history();
+  }
+  updateNotificationSettings(input: unknown) {
+    return this.repositories.notifications.update(validate(notificationSettingsSchema, input));
+  }
   listAiAnalyses(runId: unknown) {
     return this.repositories.aiAnalyses.list(validate(entityIdSchema, runId));
   }
@@ -114,3 +132,5 @@ export class MonitoringService {
   }
 }
 export * from './ai.js';
+export * from './automation.js';
+export * from './billing.js';

@@ -1,5 +1,9 @@
 # Operations
 
+Phase 12 requires all eleven migrations and explicit DEPLOYMENT_ENV for compiled production-mode startup (`local` for local previews only). Read [production configuration, secret migration, retention, readiness and backup recovery](HARDENING.md) before deployment. Environment confirmation flags must reflect verified infrastructure; they do not provision protections. No Docker is required locally.
+
+Phase 11 requires all ten migrations. Billing stays disabled until a price and paid run allowance are configured consistently in web and runner. Keep test mode on for acceptance; live mode can create real merchant-approved subscription charges. The runner needs Shopify offline credentials when billing is enabled. Observe billing synchronization failures: paid admission closes after one hour without verification. Disabling billing does not cancel existing Shopify charges. See [activation and acceptance](BILLING.md).
+
 ## Local Node development
 
 Install Node 22.15+ within major 22 and pnpm 10.34.6. Run `pnpm install --frozen-lockfile`, then `pnpm dev`. Open http://127.0.0.1:3000. No Docker is started or downloaded by these commands.
@@ -12,7 +16,7 @@ For a production build, run `pnpm build`, then `pnpm start`. Run `pnpm start:run
 
 `pnpm db:migrate` applies explicit reviewed migrations to DATABASE_URL. Migrations are never run implicitly by app startup. Use a separate TEST_DATABASE_URL for database tests. Never reset or delete database data automatically.
 
-Phase 2 adds Monitor/TestRun; Phase 3 adds dispatch intent, leases and attempt metadata. Apply all migrations before using the API/runner. To test, migrate a separate disposable database using its URL as DATABASE_URL, then run `pnpm test:database` with TEST_DATABASE_URL set to that same database. Set TEST_REDIS_URL for `pnpm test:queue`. Historical Phase 2 queued records remain inert; monitor schedules do not trigger recurring work yet.
+Phase 2 adds Monitor/TestRun; Phase 3 adds dispatch intent, leases and attempt metadata. Apply all migrations before using the API/runner. To test, migrate a separate disposable database using its URL as DATABASE_URL, then run `pnpm test:database` with TEST_DATABASE_URL set to that same database. Set TEST_REDIS_URL for `pnpm test:queue`. Historical Phase 2 queued records remain inert. Phase 10 scheduling requires explicit deployment activation.
 
 ## CI and optional containers
 
@@ -33,3 +37,5 @@ Phase 6 adds the reviewed RunAnalysis/Finding migration, with no new service or 
 Phase 7 adds the incident migration; apply it before running the new web/runner builds. No extra services, credentials or dependencies are needed. Inspect authenticated incident APIs for OPEN/RESOLVED status and lifetime distinct-run counts. Completion and reconciliation commit together; database contention or reconciliation failure can produce terminal ANALYSIS_FAILED. Old configurations are not automatically marked recovered, and no historical backfill or email alert delivery is implemented. Verify concurrent completion/rollback using the dedicated database suite. See [incident operations](INCIDENTS.md).
 
 Phase 8 adds the AiAnalysis migration; apply all eight migrations before starting these builds. AI stays off unless explicitly enabled with a key, compatible model and current token rates. Invalid AI configuration disables only enrichment. Observe `ai.disabled`, `ai.skipped`, `ai.succeeded`, `ai.failed`, `ai.commit.rejected` and `ai.recovery.failed` events; inspect separate run-detail `aiAnalyses` records. Interrupted requests expire after two minutes and are never automatically retried. The shutdown deadline is 375 seconds to permit a bounded AI tail. No historical backfill, model-quality guarantee, tenant budget enforcement or live provider acceptance is implied. See [AI setup and acceptance](AI.md).
+
+Phase 10 requires all nine migrations. Set SCHEDULER_ENABLED=true to activate eligible monitors; EMAIL_ENABLED=true additionally requires the Resend sender/key, app origin and merchant opt-in. Keep flags/configuration consistent across web and runner. Defaults remain off. Uninstall disables both monitors and channels. Review persisted email status and metadata-only logs; never replay FAILED records beyond the provider idempotency window. Read [automation setup, retry policy and acceptance](AUTOMATION.md) before enabling. No Docker or live mail is needed for local unit/browser checks.

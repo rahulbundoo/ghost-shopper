@@ -49,9 +49,19 @@ Lists accept `limit` (default 25, maximum 100) and `offset` (default 0, maximum 
 
 Validation errors return 400/INVALID_INPUT with field names only. Missing bearer credentials return 401; invalid credentials retain Shopify's authentication challenge. Inactive shops return 403/SHOP_INACTIVE. Cross-tenant and absent entity lookups return the same 404/NOT_FOUND. Disabled-monitor writes and concurrent/stale updates return 409. Unsupported authenticated write methods return 405. Infrastructure failures remain opaque 503 responses with a request ID.
 
-Shop creation and identity updates remain exclusively in the existing authenticated installation/GraphQL flow; there is no public Shop create endpoint. Monitoring UI, scheduling, rate limiting and full production hardening remain later phases.
+Shop creation and identity updates remain exclusively in the existing authenticated installation/GraphQL flow; there is no public Shop create endpoint. Phase 9 adds monitoring UI, Phase 10 adds scheduling and email settings. General rate limiting and full production hardening remain later phases.
 
-## Incidents
+## Notification settings
+
+GET `/app/api/notifications` returns `{settings, history}` for the authenticated active tenant. Settings is null before first save, otherwise `{email, enabled, recoveryEnabled, version}`. History is the latest ten records with id, runId, kind, status, createdAt and finishedAt, without recipient snapshots or leases. PATCH accepts exactly those four settings fields; version 0 creates only if absent, later writes require the current version. Invalid input is 400; stale/existing-create versions are 409. Settings changes cancel pending deliveries; no test message is sent. Both endpoints require bearer authentication and use no-store responses.
+
+Run creation now serializes with scheduling using the monitor lock and returns 409/CONFLICT when any nonterminal run exists for the monitor. This avoids overlaps but is not a lifetime idempotency key: check history before retrying an ambiguous completed request. See [alert policy](AUTOMATION.md).
+
+## Billing
+
+GET `/app/api/billing` returns deployment availability and the authenticated tenant's subscription/allowance summary after provider reconciliation. POST accepts exactly `{action: "checkout" | "cancel" | "refresh"}`. Prices, shop IDs, subscription IDs and return URLs cannot be supplied by clients. Checkout returns a Shopify confirmation URL; it does not activate access. Cancellation uses the verified server-owned subscription and does not prorate. Both methods require App Bridge bearer authentication and return no-store responses. The document route `/app/billing` independently authenticates. Run creation returns HTTP 402 for `BILLING_REQUIRED` or `RUN_LIMIT_REACHED` when billing is enabled; scheduler admission uses the same rule. See [billing behavior](BILLING.md).
+
+## Incident reads
 
 GET `/app/api/incidents` returns `{incidents}` and accepts monitorId, status (OPEN/RESOLVED), limit and offset. Defaults and bounds match other lists. Order is lastSeenAt descending then ID descending. GET `/app/api/incidents/:incidentId` returns `{incident, occurrences}`, with limit/offset for occurrence history ordered by createdAt descending then ID descending. Missing or cross-tenant IDs return the same 404; inactive shops receive 403. Every route authenticates independently and uses no-store responses.
 

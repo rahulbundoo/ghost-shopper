@@ -1,5 +1,7 @@
 # Architecture
 
+Phase 12 retains the two deployable applications. PostgreSQL coordinates shared request budgets and durable deletion leases; runner maintenance removes expired evidence and records dependency heartbeats. The web readiness endpoint is token-protected. Session encryption wraps the official adapter, and optional Sentry receives only fixed metadata. [ADR 0017](../adr/0017-production-hardening.md) documents deployment boundaries and operational acceptance.
+
 ## Accepted structure
 
 A modular monolith plus an independent browser worker. Web owns Shopify integration, authenticated configuration and presentation. Runner owns asynchronous browser execution and processing. Packages are internal boundaries, not network services.
@@ -65,3 +67,15 @@ Domain owns incident vocabulary, recovery eligibility and stable ordering/config
 ## Phase 8 boundary
 
 Application defines AiProvider and AiAnalysisRepository ports; domain owns experience types and severity policy; contracts validates bounded structured inputs/results. The AI adapter owns the immutable prompt and single OpenAI HTTP integration. Runner collects a bounded subset of existing masked screenshots and invokes optional AI after technical completion. Database reserves one-shot requests and stores separate audit/results/cost metadata. Web reads AI results through tenant-bound repositories but does not load the provider. No service or external dependency is added. See [ADR 0014](../adr/0014-optional-ai-analysis.md).
+
+## Phase 9 boundary
+
+Merchant UI is confined to web: independently authenticated React Router loaders call MonitoringService and tenant-bound repositories; App Bridge fetch sends mutations to existing authenticated APIs. Private evidence is signed only on demand. Technical and AI views remain separate and attempt-scoped. Overview queries are bounded recent samples, not new aggregate health rules. A synthetic UI harness outside production routes supports Docker-free checks. No schema, service, dependency, Shopify scope or runner boundary changed. See [merchant UI](MERCHANT_UI.md).
+
+## Phase 11 boundary
+
+Phase 11 retains these boundaries. Domain owns allowance policy; application owns BillingProvider/BillingRepository ports and approval/reconciliation orchestration. Database serializes admission and writes usage with the queued run. The Shopify adapter performs billing GraphQL requests. Web exposes authenticated billing management; runner periodically verifies installed tenants through stored offline sessions. Browser execution does not know about prices or subscriptions. See [ADR 0016](../adr/0016-billing-admission.md).
+
+## Phase 10 boundary
+
+Domain owns cadence/significance policy and settings/history types. Application owns AutomationStore/EmailSender ports and bounded delivery orchestration. Database coordinates due monitors, durable dispatch intent and incident email intent using existing PostgreSQL transactions, then fences delivery leases and persists cooldowns. Notifications implements a fixed Resend HTTP adapter; only runner loads it. Web provides authenticated settings and history through MonitoringService. There is no new deployable service or third-party runtime dependency. See [ADR 0015](../adr/0015-durable-scheduling-alerts.md) and [automation operations](AUTOMATION.md).

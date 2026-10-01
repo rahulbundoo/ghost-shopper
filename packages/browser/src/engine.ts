@@ -16,6 +16,7 @@ import { EvidenceCollector, type EvidenceSink } from './evidence.js';
 export interface BrowserEngineOptions {
   channel?: 'chrome' | 'msedge' | 'chromium';
   actionTimeoutMs?: number;
+  traceEnabled?: boolean;
   /** Injection is for controlled browser fixtures; production always launches Chromium. */
   launch?: typeof chromium.launch;
   fixtureTransport?: FixtureTransport;
@@ -97,7 +98,9 @@ export class PlaywrightJourneyEngine {
     let browser: Browser | undefined;
     let context: BrowserContext | undefined;
     let cleanupFailure = false;
-    const evidence = evidenceSink ? new EvidenceCollector(evidenceSink) : undefined;
+    const evidence = evidenceSink
+      ? new EvidenceCollector(evidenceSink, this.options.traceEnabled ?? true)
+      : undefined;
     let aborted = false;
     let collecting = false;
     let abortTask: Promise<void> | undefined;

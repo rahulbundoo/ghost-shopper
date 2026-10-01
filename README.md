@@ -4,7 +4,11 @@ Synthetic shopping for Shopify stores. The V1 journey stops at checkout initiati
 
 ## Current status
 
+Phase 12 adds encrypted sessions, shared API rate limits, durable artifact deletion, protected readiness, optional metadata-only Sentry reporting and backup/restore tooling. Apply all eleven migrations and follow [production hardening and acceptance](docs/HARDENING.md). These controls do not establish deployment readiness until the documented infrastructure and restore checks pass. Local operation remains Docker-free.
+
 Phase 8 adds optional OpenAI experience analysis with versioned prompts, strict validated findings, separate tenant-scoped audit records and token/cost tracking. AI is disabled by default and cannot change technical outcomes or incidents. See [AI configuration and limits](docs/AI.md), [incident rules](docs/INCIDENTS.md), [analysis rules](docs/ANALYSIS.md) and [evidence setup](docs/EVIDENCE.md). Live Shopify acceptance still requires an authorized test store, PostgreSQL, Redis and private storage; AI additionally requires explicit evidence-transmission opt-in and provider configuration. [AGENT.md](AGENT.md) defines the build order.
+
+Phase 11 adds an opt-in Shopify paid plan, trial, Billing screen and atomic run allowances. Apply all ten migrations and follow [billing configuration and acceptance](docs/BILLING.md). No price is selected automatically; billing defaults off and test mode defaults on.
 
 ## Run locally without Docker
 
@@ -19,7 +23,7 @@ Open http://127.0.0.1:3000. The public shell runs without credentials and clearl
 
 For a real Shopify connection, follow [Shopify setup](docs/SHOPIFY_SETUP.md). Use a native or remote PostgreSQL database. Redis, MinIO, Docker and the runner are not needed for Phase 1.
 
-Apply the migrations with `pnpm db:migrate`. See the [monitoring API](docs/MONITORING_API.md) for authenticated operations and [runner setup](docs/RUNNER.md) for native/remote Redis and S3 configuration. Set BROWSER_CHANNEL=chrome to use your installed Chrome without downloading a browser. In a second terminal, `pnpm dev:runner` builds and starts the queue consumer. Merchant monitoring screens remain deferred; evidence is available through the authenticated API.
+Apply the migrations with `pnpm db:migrate`. See the [monitoring API](docs/MONITORING_API.md) for authenticated operations and [runner setup](docs/RUNNER.md) for native/remote Redis and S3 configuration. Set BROWSER_CHANNEL=chrome to use your installed Chrome without downloading a browser. In a second terminal, `pnpm dev:runner` builds and starts the queue consumer. Phase 9 adds merchant overview, monitor management, run/incident details, findings and private evidence screens. Phase 10 adds opt-in recurring scheduling and incident/recovery emails with bounded retries and spam prevention. Apply all ten migrations and follow [automation activation](docs/AUTOMATION.md); defaults do not send email or schedule runs. See [merchant UI and local preview](docs/MERCHANT_UI.md) and [Phase 11 billing](docs/BILLING.md).
 
 | Command               | Purpose                                                                 |
 | --------------------- | ----------------------------------------------------------------------- |

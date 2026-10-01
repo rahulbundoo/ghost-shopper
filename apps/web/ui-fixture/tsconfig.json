@@ -1,0 +1,4 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["*.ts", "*.tsx", "../app/app-bridge.d.ts"]
+}

@@ -58,6 +58,8 @@ export default defineConfig({
         resolve: { alias: sourceAliases },
         test: {
           name: 'database',
+          // Scheduler tests scan all eligible tenants in this dedicated test database.
+          fileParallelism: false,
           environment: 'node',
           include: ['tests/database/**/*.test.ts'],
           testTimeout: 15_000,

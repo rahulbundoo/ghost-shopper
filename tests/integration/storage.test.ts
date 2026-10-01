@@ -77,4 +77,12 @@ describe('S3 SDK wire contract (controlled HTTP server, not live S3)', () => {
       storage.put('../escape', { type: 'CONSOLE', body: Buffer.from('{}'), stepPosition: null }),
     ).rejects.toThrow('INVALID_ARTIFACT_KEY');
   });
+  it('sends a signed exact-key deletion and rejects path traversal', async () => {
+    await storage.delete(key);
+    expect(requests.at(-1)).toMatchObject({
+      method: 'DELETE',
+      headers: { authorization: expect.stringContaining('AWS4-HMAC-SHA256') as unknown },
+    });
+    await expect(storage.delete('../other-tenant')).rejects.toThrow('INVALID_ARTIFACT_KEY');
+  });
 });

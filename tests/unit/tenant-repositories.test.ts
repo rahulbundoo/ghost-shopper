@@ -37,6 +37,7 @@ const monitor: Monitor = {
 };
 function fixture() {
   const tx = {
+    $queryRaw: vi.fn().mockResolvedValue([{ id }]),
     incident: {
       findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),

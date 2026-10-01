@@ -57,11 +57,19 @@ export async function startEgressProxy(hosts: ReadonlySet<string>) {
   const password = randomBytes(24).toString('hex');
   const authorization = `Basic ${Buffer.from(`runner:${password}`).toString('base64')}`;
   const sockets = new Set<Socket>();
+  let transferred = 0;
+  let connections = 0;
+  let exhausted = false;
   const server = createServer((_request, response) => {
     response.writeHead(403).end();
   });
   server.on('connection', (socket) => {
+    if (exhausted || sockets.size >= 128 || ++connections > 512) {
+      socket.destroy();
+      return;
+    }
     sockets.add(socket);
+    socket.setTimeout(15000, () => socket.destroy());
     socket.on('close', () => sockets.delete(socket));
     socket.on('error', () => socket.destroy());
   });
@@ -82,8 +90,17 @@ export async function startEgressProxy(hosts: ReadonlySet<string>) {
     void resolve4(host)
       .then((addresses) => {
         if (socket.destroyed) return;
+        if (exhausted || sockets.size >= 128) throw new Error('PROXY_CAPACITY_EXCEEDED');
         if (!addresses.length || !addresses.every(isPublicIPv4)) throw new Error('UNSAFE_ADDRESS');
         const upstream = createConnection({ host: addresses[0]!, port: 443 });
+        upstream.setTimeout(15000, () => upstream.destroy());
+        upstream.on('data', (chunk: Buffer) => {
+          transferred += chunk.length;
+          if (transferred > 64 * 1024 * 1024) {
+            exhausted = true;
+            for (const connection of sockets) connection.destroy();
+          }
+        });
         sockets.add(upstream);
         upstream.on('close', () => sockets.delete(upstream));
         upstream.on('error', () => {

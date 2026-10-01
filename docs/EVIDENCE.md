@@ -31,9 +31,9 @@ Evidence failure never turns a failed journey into a pass. An otherwise successf
 
 ## Retention and acceptance
 
-ARTIFACT_RETENTION_DAYS defaults to 7 (allowed 1–30). Expiry blocks new application download links; it does **not** delete objects. Configure and verify bucket lifecycle deletion for `evidence/`, including noncurrent versions if versioning is enabled, consistent with the chosen retention policy. This also cleans private orphan objects. Retention configuration changes do not rewrite existing metadata. No background object/metadata sweeper is implemented in Phase 5.
+ARTIFACT_RETENTION_DAYS defaults to 7 (allowed 1–30). Expiry blocks new download links. Phase 12 adds durable, lease-fenced object deletion at expiry; bucket lifecycle remains mandatory for failures, orphans and noncurrent versions. Retention configuration changes do not rewrite existing metadata. Native traces now default off in the runner (`TRACE_ENABLED=false`). See [retention and deployment acceptance](HARDENING.md).
 
-Uninstall immediately blocks new API access and revokes run leases. Verified shop redaction cascades database metadata, but object bytes remain until bucket lifecycle expiration; immediate verified object erasure requires an operator procedure before production compliance sign-off. Keep backups and object retention aligned with your privacy policy.
+Uninstall immediately blocks new API access and revokes run leases. Verified shop redaction cascades database metadata and accelerates surviving deletion intents after a ten-minute in-flight-upload grace period. Storage errors, versioning and immutable retention can delay physical erasure; verify deletion and lifecycle behavior before privacy sign-off. Keep backups and object retention aligned with your privacy policy.
 
 `pnpm test:browser` checks real Chrome capture against controlled storefront responses. `pnpm check` tests authorization, upload coordination and signed SDK requests against a controlled HTTP server. `pnpm test:database` requires migrated TEST_DATABASE_URL and exercises real artifact constraints/tenant isolation. `pnpm test:storage` requires dedicated TEST_S3_* settings, uploads one generated fixture, verifies anonymous denial and signed retrieval, and deletes only that object. CI supplies disposable services; local checks never provision them.
 

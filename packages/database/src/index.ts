@@ -5,9 +5,12 @@ export { PrismaRunStore } from './run-store.js';
 export { PrismaArtifactRepository } from './artifacts.js';
 export { PrismaAnalysisRepository } from './analysis.js';
 export { PrismaAiAnalysisRepository } from './ai.js';
+export { PrismaAutomationStore } from './automation.js';
+export { PrismaBillingRepository } from './billing.js';
+export { PrismaMaintenance, PrismaRateLimiter } from './hardening.js';
 
 export { PrismaClient } from '@prisma/client';
-export type { Shop } from '@prisma/client';
+export type { Shop, Prisma } from '@prisma/client';
 
 export function createDatabase(databaseUrl: string): PrismaClient {
   return new PrismaClient({ datasources: { db: { url: databaseUrl } } });
@@ -67,6 +70,36 @@ export class ShopRepository {
         where: { id, uninstalledAt: null },
         data: { uninstalledAt: new Date(), scopes: '' },
       }),
+      this.db.monitor.updateMany({
+        where: { shopId: id },
+        data: { enabled: false, version: { increment: 1 } },
+      }),
+      this.db.notificationChannel.updateMany({
+        where: { shopId: id },
+        data: { enabled: false, version: { increment: 1 } },
+      }),
+      this.db.subscription.updateMany({
+        where: { shopId: id },
+        data: {
+          status: 'INACTIVE',
+          providerId: null,
+          verifiedAt: null,
+          syncStartedAt: new Date(),
+          checkoutToken: null,
+          checkoutExpiresAt: null,
+          approvalUrl: null,
+          nextSyncAt: new Date(),
+        },
+      }),
+      this.db.emailDelivery.updateMany({
+        where: { shopId: id, status: { in: ['PENDING', 'SENDING'] } },
+        data: {
+          status: 'CANCELLED',
+          finishedAt: new Date(),
+          leaseToken: null,
+          leaseExpiresAt: null,
+        },
+      }),
     ]);
   }
 
@@ -82,6 +115,15 @@ export class ShopRepository {
   // Shopify sends shop/redact after uninstall; a reinstalled shop must be retained.
   async redactUninstalledShop(authenticatedShop: string) {
     const id = shopDomainSchema.parse(authenticatedShop);
-    await this.db.shop.deleteMany({ where: { id, uninstalledAt: { not: null } } });
+    await this.db.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT "id" FROM "Shop" WHERE "id" = ${id} AND "uninstalledAt" IS NOT NULL FOR UPDATE`;
+      if (!rows.length) return;
+      // Allow bounded in-flight uploads to settle before deleting their bytes.
+      await tx.$executeRaw`UPDATE "ArtifactDeletion" SET "nextAttemptAt" = ${new Date(Date.now() + 600000)}, "leaseToken" = NULL, "leaseExpiresAt" = NULL
+        WHERE "storageKey" IN (SELECT "storageKey" FROM "Artifact" WHERE "shopId" = ${id})`;
+      await tx.shop.deleteMany({ where: { id, uninstalledAt: { not: null } } });
+    });
   }
 }

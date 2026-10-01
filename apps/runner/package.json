@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@ghostshopper/shopify": "workspace:*",
+    "@ghostshopper/notifications": "workspace:*",
     "@ghostshopper/ai": "workspace:*",
     "@ghostshopper/storage": "workspace:*",
     "@ghostshopper/browser": "workspace:*",

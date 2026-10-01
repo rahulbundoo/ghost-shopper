@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   analyses: vi.fn(),
   aiAnalyses: vi.fn(),
 }));
+vi.mock('../../apps/web/app/hardening.server.js', () => ({ enforceRateLimit: vi.fn() }));
 vi.mock('../../apps/web/app/shopify.server.js', () => ({
   getRuntime: () => ({ db: {}, shopify: { authenticate: { admin: mocks.authenticate } } }),
   withShopifyBoundary: (operation: () => Promise<unknown>) => operation(),

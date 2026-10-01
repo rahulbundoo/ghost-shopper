@@ -3,6 +3,7 @@ import { ValidationError } from '@ghostshopper/contracts';
 import { createTenantRepositories } from '@ghostshopper/database';
 import { DomainError } from '@ghostshopper/domain';
 import { getRuntime, withShopifyBoundary } from './shopify.server.js';
+import { enforceRateLimit } from './hardening.server.js';
 
 export function jsonResponse(value: unknown, status = 200): Response {
   return Response.json(value, {
@@ -22,15 +23,25 @@ export async function monitoringRequest(
       if (!request.headers.get('Authorization')?.startsWith('Bearer ')) {
         return jsonResponse({ error: { code: 'UNAUTHORIZED' } }, 401);
       }
-      const { shopify, db } = getRuntime();
+      const { shopify, db, billing } = getRuntime();
       const { session } = await shopify.authenticate.admin(request);
+      await enforceRateLimit(
+        db,
+        session.shop,
+        request.method === 'GET' ? 'read' : 'write',
+        request.method === 'GET' ? 120 : 20,
+      );
       if (!methods.includes(request.method)) {
         return new Response(null, {
           status: 405,
           headers: { Allow: methods.join(', '), 'Cache-Control': 'no-store' },
         });
       }
-      const service = new MonitoringService(createTenantRepositories(db, session.shop));
+      const service = new MonitoringService(
+        billing
+          ? createTenantRepositories(db, session.shop, billing)
+          : createTenantRepositories(db, session.shop),
+      );
       try {
         return await operation(service);
       } catch (error) {
@@ -38,7 +49,13 @@ export async function monitoringRequest(
           return jsonResponse({ error: { code: 'INVALID_INPUT', fields: error.fields } }, 400);
         if (error instanceof DomainError) {
           const status =
-            error.code === 'NOT_FOUND' ? 404 : error.code === 'SHOP_INACTIVE' ? 403 : 409;
+            error.code === 'NOT_FOUND'
+              ? 404
+              : error.code === 'SHOP_INACTIVE'
+                ? 403
+                : error.code === 'BILLING_REQUIRED' || error.code === 'RUN_LIMIT_REACHED'
+                  ? 402
+                  : 409;
           return jsonResponse({ error: { code: error.code } }, status);
         }
         throw error;

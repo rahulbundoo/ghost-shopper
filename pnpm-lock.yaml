@@ -74,12 +74,18 @@ importers:
       '@ghostshopper/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@ghostshopper/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@ghostshopper/observability':
         specifier: workspace:*
         version: link:../../packages/observability
       '@ghostshopper/queue':
         specifier: workspace:*
         version: link:../../packages/queue
+      '@ghostshopper/shopify':
+        specifier: workspace:*
+        version: link:../../packages/shopify
       '@ghostshopper/storage':
         specifier: workspace:*
         version: link:../../packages/storage
@@ -220,7 +226,11 @@ importers:
 
   packages/domain: {}
 
-  packages/notifications: {}
+  packages/notifications:
+    dependencies:
+      '@ghostshopper/application':
+        specifier: workspace:*
+        version: link:../application
 
   packages/observability: {}
 
@@ -238,6 +248,9 @@ importers:
 
   packages/shopify:
     dependencies:
+      '@ghostshopper/application':
+        specifier: workspace:*
+        version: link:../application
       '@ghostshopper/config':
         specifier: workspace:*
         version: link:../config
@@ -247,6 +260,9 @@ importers:
       '@ghostshopper/database':
         specifier: workspace:*
         version: link:../database
+      '@ghostshopper/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@prisma/client':
         specifier: 6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)

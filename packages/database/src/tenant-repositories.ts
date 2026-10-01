@@ -2,8 +2,16 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import { publicRunSelection } from './run-selection.js';
 import { mapAiAnalysis } from './ai.js';
 import { publicArtifactSelection } from './artifacts.js';
+import { admitRun } from './billing.js';
+import type { BillingPolicy } from '@ghostshopper/domain';
 import type { TenantRepositories } from '@ghostshopper/application';
-import { assertShopActive, DomainError, snapshotMonitor, type Shop } from '@ghostshopper/domain';
+import {
+  assertShopActive,
+  DomainError,
+  snapshotMonitor,
+  nextScheduledTime,
+  type Shop,
+} from '@ghostshopper/domain';
 import {
   createMonitorSchema,
   entityIdSchema,
@@ -13,6 +21,7 @@ import {
   shopDomainSchema,
   updateMonitorSchema,
   validate,
+  notificationSettingsSchema,
 } from '@ghostshopper/contracts';
 
 const shopSelection = {
@@ -31,6 +40,7 @@ const shopSelection = {
 export function createTenantRepositories(
   db: PrismaClient,
   authenticatedShop: string,
+  billingPolicy?: BillingPolicy | null,
 ): TenantRepositories {
   const shopId = validate(shopDomainSchema, authenticatedShop);
 
@@ -58,6 +68,62 @@ export function createTenantRepositories(
   }
 
   return {
+    notifications: {
+      history: () =>
+        activeTransaction((tx) =>
+          tx.emailDelivery.findMany({
+            where: { shopId },
+            select: {
+              id: true,
+              runId: true,
+              kind: true,
+              status: true,
+              createdAt: true,
+              finishedAt: true,
+            },
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: 10,
+          }),
+        ),
+      get: () =>
+        activeTransaction((tx) =>
+          tx.notificationChannel.findUnique({
+            where: { shopId },
+            select: { email: true, enabled: true, recoveryEnabled: true, version: true },
+          }),
+        ),
+      update: (input) => {
+        const { version, ...settings } = validate(notificationSettingsSchema, input);
+        return activeTransaction(async (tx) => {
+          if (version === 0) {
+            const created = await tx.notificationChannel.createMany({
+              data: [{ ...settings, shopId }],
+              skipDuplicates: true,
+            });
+            if (created.count !== 1) throw new DomainError('CONFLICT');
+          } else {
+            const updated = await tx.notificationChannel.updateMany({
+              where: { shopId, version },
+              data: { ...settings, version: { increment: 1 } },
+            });
+            if (updated.count !== 1) throw new DomainError('CONFLICT');
+          }
+          await tx.emailDelivery.updateMany({
+            where: { shopId, status: { in: ['PENDING', 'SENDING'] } },
+            data: {
+              status: 'CANCELLED',
+              finishedAt: new Date(),
+              leaseToken: null,
+              leaseExpiresAt: null,
+            },
+          });
+          return tx.notificationChannel.findUniqueOrThrow({
+            where: { shopId },
+            select: { email: true, enabled: true, recoveryEnabled: true, version: true },
+          });
+        });
+      },
+    },
     aiAnalyses: {
       list: (input) => {
         const runId = validate(entityIdSchema, input);
@@ -180,6 +246,14 @@ export function createTenantRepositories(
               ...(changes.enabled !== undefined ? { enabled: changes.enabled } : {}),
               ...(variantId !== undefined ? { variantId } : {}),
               version: { increment: 1 },
+              ...(changes.frequency !== undefined || changes.enabled === true
+                ? {
+                    nextRunAt: nextScheduledTime(
+                      new Date(),
+                      changes.frequency ?? current.frequency,
+                    ),
+                  }
+                : {}),
             },
           });
           if (result.count !== 1) throw new DomainError('CONFLICT');
@@ -201,13 +275,30 @@ export function createTenantRepositories(
       create: (identifier) => {
         const monitorId = validate(entityIdSchema, identifier);
         return activeTransaction(async (tx) => {
+          await tx.$queryRaw`SELECT "id" FROM "Monitor" WHERE "shopId" = ${shopId} AND "id" = ${monitorId}::uuid FOR UPDATE`;
           const monitor = await tx.monitor.findFirst({ where: { shopId, id: monitorId } });
           if (!monitor) throw new DomainError('NOT_FOUND');
           const snapshot = snapshotMonitor(monitor);
-          return tx.testRun.create({
+          const active = await tx.testRun.findFirst({
+            where: {
+              shopId,
+              monitorId,
+              status: { in: ['QUEUED', 'RUNNING', 'COLLECTING', 'ANALYZING'] },
+            },
+            select: { id: true },
+          });
+          if (active) throw new DomainError('CONFLICT');
+          const admission = billingPolicy ? await admitRun(tx, shopId, billingPolicy) : null;
+          if (admission && 'error' in admission) throw new DomainError(admission.error);
+          const run = await tx.testRun.create({
             data: { ...snapshot, shopId, monitorId, status: 'QUEUED', dispatchRequested: true },
             select: publicRunSelection,
           });
+          if (admission)
+            await tx.usageRecord.create({
+              data: { shopId, runId: run.id, periodKey: admission.periodKey },
+            });
+          return run;
         });
       },
       get: (input) => {

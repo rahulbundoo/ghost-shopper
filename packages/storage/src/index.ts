@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { ArtifactStorage } from '@ghostshopper/application';
 import { ARTIFACT_FORMATS, type CapturedEvidence, type StoredArtifact } from '@ghostshopper/domain';
@@ -69,5 +74,15 @@ export class S3ArtifactStorage implements ArtifactStorage {
   }
   close() {
     this.client.destroy();
+  }
+  async delete(key: string) {
+    assertArtifactKey(key);
+    try {
+      await this.client.send(new DeleteObjectCommand({ Bucket: this.config.bucket, Key: key }), {
+        abortSignal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      throw new Error('OBJECT_DELETE_FAILED');
+    }
   }
 }

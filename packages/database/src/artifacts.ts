@@ -67,6 +67,9 @@ export class PrismaArtifactRepository implements ArtifactRepository {
           expiresAt: data.expiresAt,
         },
       });
+      await tx.artifactDeletion.create({
+        data: { storageKey: data.storageKey, nextAttemptAt: data.expiresAt },
+      });
       return true;
     });
   }
