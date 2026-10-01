@@ -1,29 +1,61 @@
 # Domain
 
-Phase 11 adds infrastructure-free BillingPolicy, SubscriptionSnapshot and runAllowance rules. Trials are time- and run-limited; paid access requires a current period, matching test/live policy and fresh verification. Subscription and UsageRecord persistence belongs to database; BillingProvider/BillingRepository ports and billing orchestration belong to application. Browser outcomes do not determine subscription state or trigger additional charges. See [billing semantics](BILLING.md).
+`packages/domain` contains infrastructure-free business concepts and policy.
 
-## Reserved terminology
+It must not import Shopify, Playwright, Prisma, Redis/BullMQ, AI SDKs, Zod, React, Node APIs, or storage/provider SDKs.
 
-Shop, Monitor, Scenario, TestRun, RunStep, Finding, Incident and Artifact have the meanings defined in [AGENT.md](../AGENT.md). Merchant-owned entities require shopId; tenant context must come from server-side authentication.
+## Current terminology
 
-## Implementation status
+- **Shop** — installed Shopify merchant/store.
+- **Monitor** — recurring configured deterministic check.
+- **Scenario** — reusable execution mode; currently `PURCHASE_JOURNEY`.
+- **TestRun** — one execution snapshot of one monitor.
+- **RunStep** — one deterministic journey action result.
+- **Finding** — one classified technical problem.
+- **Incident** — persistent/recurrent deterministic problem identity.
+- **Artifact** — private evidence metadata.
+- **AiAnalysis** — separately labelled subjective post-run AI interpretation.
+- **Subscription / UsageRecord** — billing access/allowance concepts.
 
-Phase 2 defines infrastructure-free Shop, Monitor, TestRun and JourneyConfiguration types, closed scenario/device/frequency/run-state vocabularies, active-shop rules and enabled-monitor snapshots. Domain imports no frameworks, validation library, Node APIs or database code.
+Merchant-owned persisted entities remain tenant-scoped by `shopId`.
 
-Contracts validates unknown boundary inputs with strict Zod schemas, rejecting caller-owned tenant IDs, entity IDs, run statuses and unsupported scenarios. Application owns repository ports and MonitoringService use cases. Database implements these ports with tenant-bound Prisma repositories; web supplies tenant context exclusively from authenticated Shopify sessions.
+## Current invariants
 
-Monitor snapshots keep a TestRun's execution inputs independent of subsequent configuration edits. A run starts QUEUED with no outcome. Phase 3 validates QUEUED → RUNNING → COLLECTING → ANALYZING → COMPLETED, with ERROR/CANCELLED exits and bounded active-to-QUEUED retries. Terminal states cannot restart. Infrastructure leases and fencing live in the database adapter, not the domain. No public generic state-mutation endpoint exists.
+- monitor configuration is snapshotted into a run;
+- run state/outcomes use closed vocabularies;
+- deterministic finding types/severity/scoring are code-owned;
+- incomplete evidence does not become a perfect score;
+- incident identity is stable and does not depend on free-form AI text;
+- AI analysis never mutates deterministic incident/scoring policy;
+- infrastructure locking, hashing, HTTP, credentials, and SDK details stay outside domain.
 
-## Planned rules
+## Planned Phase 13 terminology
 
-Run lifecycle states and terminal outcomes must be explicit types. Deterministic findings remain separate from AI interpretation. Incident deduplication uses stable identifiers and taxonomy, never free-form AI descriptions.
+The autonomous evolution may add infrastructure-free concepts such as:
 
-Validation, active-shop/enabled-monitor rules, immutable snapshots, tenant isolation, transitions and concurrent monitor edits have tests. Phase 4 adds ActionResult and RunStep: seven closed action names, PASSED/FAILED/SKIPPED statuses, start/end/duration, sanitized URL and closed error codes. RunStep includes tenant/run/attempt identity. Phase 5 adds Artifact metadata, closed SCREENSHOT/TRACE/CONSOLE/NETWORK/METADATA types, PENDING/READY/FAILED upload states and infrastructure-free captured byte payloads. Application owns evidence repository/storage ports.
+- **ShopperMission** — bounded shopper goal/persona constraints;
+- **BrowserObservation** — sanitized versioned view of current storefront state;
+- **InteractionCandidate** — short-lived opaque target the model may reference;
+- **ShopperDecision** — one structured model decision;
+- **ShopperAction** — closed semantic action intent;
+- **AgentBudget** — code-owned run/action/provider limits;
+- **AgentRunStep** — audited observation/decision/policy/execution result;
+- **AgentStopReason** — explicit bounded terminal reason.
 
-Phase 6 adds Finding/RunAnalysis, eleven closed technical finding types, severity mapping, pure analysis/scoring and canonical fingerprint identity rules. Domain returns stable identity text; the database adapter supplies SHA-256 without introducing Node crypto into domain. Technical Finding uses source DETECTED. Incomplete analysis has a null score. See [versioned rules](ANALYSIS.md).
+Exact names may change during Phase 13.1, but the trust boundary may not: domain describes intent/policy, not Playwright selectors or provider SDK payloads.
 
-Phase 7 adds Incident/IncidentOccurrence, closed OPEN/RESOLVED states, configuration-scope identity, stable observation ordering and a conservative recovery predicate. Complete zero-finding passes can resolve incidents; other outcomes cannot. Repeated runs increment lifetime occurrence counts; recurrence reopens the same identity. Infrastructure locks, hashing and idempotent writes remain in the database adapter. See [incident semantics](INCIDENTS.md).
+## Deterministic separation
 
-Phase 8 adds JourneyAnalysisInput, JourneyAnalysis, ExperienceFinding, AiUsage and AiAnalysisRecord. Five closed experience types have code-owned noncritical severity rules. AI_ANALYSIS records carry a separate subjective score and never enter technical scoring or incident reconciliation. Provider names, version metadata and cost records are data, not infrastructure dependencies. Application owns provider/persistence ports; domain remains SDK/Node/Zod-free. See [AI analysis](AI.md).
+Do not overload existing `RunStep` or technical `Finding` semantics merely to fit autonomous data.
 
-Phase 10 adds hourly/six-hourly/daily interval policy, significant-incident selection (HIGH/CRITICAL), notification settings/history and bounded email retry/cooldown constants. Infrastructure locks, lease tokens, HTTP and credentials stay outside domain. Only detected incident transitions produce email intent; AI remains independent. See [scheduling and alerts](AUTOMATION.md).
+Agentic runs must remain distinguishable from `PURCHASE_JOURNEY`. Promotion of reproduced agent discoveries into durable incidents is deferred to a reviewed later phase.
+
+## Boundary rules
+
+Untrusted inputs are validated in `packages/contracts`.
+
+Application owns ports/use cases. Database/browser/AI packages implement adapters.
+
+If Phase 13 introduces persisted mission/action history, add tenant-scoped database constraints and explicit migrations rather than pushing persistence concerns into domain.
+
+See `EVOLUTION.md` and the Phase 13 task packet.
