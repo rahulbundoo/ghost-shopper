@@ -1,26 +1,30 @@
 # Architecture decision records
 
-Record significant choices here. Accepted decisions reflect [AGENT.md](../AGENT.md); future changes must explain consequences and require approval when materially changing the specified architecture.
+ADRs are the historical decision archive. They are **not** default Codex startup context.
 
-| ADR                                                                     | Status                            |
-| ----------------------------------------------------------------------- | --------------------------------- |
-| [0001 Modular monolith](0001-modular-monolith.md)                       | Accepted                          |
-| [0002 Browser worker separation](0002-browser-worker-separation.md)     | Accepted                          |
-| [0003 BullMQ job queue](0003-bullmq-job-queue.md)                       | Accepted; implementation deferred |
-| [0004 AI provider abstraction](0004-ai-provider-abstraction.md)         | Accepted; implemented in Phase 8  |
-| [0005 S3 artifact storage](0005-s3-artifact-storage.md)                 | Accepted; implemented in Phase 5  |
-| [0006 Deterministic/AI separation](0006-deterministic-ai-separation.md) | Accepted; implemented in Phase 8  |
-| [0007 Shopify shell](0007-shopify-shell.md)                             | Accepted                          |
-| [0008 Monitoring persistence](0008-monitoring-persistence.md)           | Accepted                          |
+Read `../AGENT.md` first. Open only the ADR relevant to the architecture or trust boundary being changed.
 
-See also [0009 Durable run dispatch](0009-durable-run-dispatch.md) (Accepted).
-See also [0010 Browser journey engine](0010-browser-journey-engine.md) (Accepted).
-See also [0011 Private evidence lifecycle](0011-private-evidence-lifecycle.md) (Accepted).
-See also [0012 Deterministic technical analysis](0012-deterministic-technical-analysis.md) (Accepted).
-See also [0013 Atomic incident lifecycle](0013-atomic-incident-lifecycle.md) (Accepted).
-See also [0014 Optional AI analysis](0014-optional-ai-analysis.md) (Accepted).
-See also [0015 Durable scheduling and incident emails](0015-durable-scheduling-alerts.md) (Accepted).
-See also [0016 Shopify subscriptions and atomic run allowances](0016-billing-admission.md) (Accepted).
-See also [0017 Production safeguards and operational acceptance](0017-production-hardening.md) (Accepted).
+| ADR | Decision |
+| --- | --- |
+| [0001](0001-modular-monolith.md) | Modular monolith |
+| [0002](0002-browser-worker-separation.md) | Independent browser worker |
+| [0003](0003-bullmq-job-queue.md) | BullMQ job queue |
+| [0004](0004-ai-provider-abstraction.md) | AI provider abstraction |
+| [0005](0005-s3-artifact-storage.md) | S3 artifact storage |
+| [0006](0006-deterministic-ai-separation.md) | Deterministic/AI separation |
+| [0007](0007-shopify-shell.md) | Shopify shell |
+| [0008](0008-monitoring-persistence.md) | Monitoring persistence |
+| [0009](0009-durable-run-dispatch.md) | Durable run dispatch |
+| [0010](0010-browser-journey-engine.md) | Deterministic browser journey |
+| [0011](0011-private-evidence-lifecycle.md) | Private evidence lifecycle |
+| [0012](0012-deterministic-technical-analysis.md) | Deterministic technical analysis |
+| [0013](0013-atomic-incident-lifecycle.md) | Atomic incident lifecycle |
+| [0014](0014-optional-ai-analysis.md) | Optional post-run AI analysis |
+| [0015](0015-durable-scheduling-alerts.md) | Scheduling and alerts |
+| [0016](0016-billing-admission.md) | Shopify billing/run admission |
+| [0017](0017-production-hardening.md) | Production safeguards |
+| [0018](0018-agentic-shopper-control-boundary.md) | Policy-gated autonomous shopper control |
 
-Use [the template](template.md) for new decisions. Do not silently rewrite accepted decisions.
+Use [the template](template.md) for a new material decision.
+
+Do not silently rewrite accepted ADRs to match new code. Add a superseding ADR when a decision changes materially.

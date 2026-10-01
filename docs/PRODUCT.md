@@ -2,16 +2,79 @@
 
 ## Vision
 
-GhostShopper detects failures and friction in Shopify storefront purchase journeys through deterministic browser checks, evidence and separately labelled optional AI interpretation.
+GhostShopper helps Shopify merchants discover purchase friction before customers do.
 
-## V1 journey
+The product has two complementary modes:
 
-Home → find product → open product → select variant → add to cart → open cart → begin checkout → stop. Never submit payment or create a real customer purchase.
+- **Deterministic monitoring** — repeatable verification of known purchase journeys.
+- **Autonomous mystery shopping** — bounded exploration of customer behavior that merchants did not explicitly script.
 
-## Delivery status
+## Current implementation
 
-Phases 0–3 provide repository tooling, the Shopify shell, tenant-scoped persistence and asynchronous dispatch. Phase 4 implements bounded desktop/mobile browser journeys and persisted step results, stopping at checkout initiation. Controlled browser fixtures are verified; real-store acceptance requires an authorized development storefront, Shopify credentials, PostgreSQL and Redis. Phase 10 activates saved monitor frequency when deployment scheduling is enabled. See [browser limits](BROWSER.md) and [AGENT.md](../AGENT.md).
+Today GhostShopper implements the deterministic mode.
 
-## Additional implemented phases and remaining work
+The active journey is:
 
-Phase 5 implements evidence capture, private storage metadata and authenticated download APIs. Phase 6 implements deterministic technical findings, severity, scores and fingerprints. Phase 7 implements incident creation, deduplication, occurrence counting and resolution/reopening with authenticated read APIs. Phase 8 adds optional, explicitly enabled AI experience analysis with validated findings, version metadata and token/cost tracking, independent of technical monitoring. Phase 9 adds the merchant overview, monitor create/edit/disable, run history/details, incident history/details, findings and private evidence access. Phase 10 adds recurring scheduling, non-overlapping manual runs, merchant email opt-in, significant incident and recovery notifications, cooldowns and bounded delivery retries. Phase 11 adds a configurable trial, one Shopify recurring plan, verified subscription state and atomic run limits. Production hardening remains deferred. No production readiness, live billing acceptance, inbox-delivery guarantee, model-quality guarantee or broad storefront compatibility is claimed. See [billing activation and limits](BILLING.md), [automation activation and limits](AUTOMATION.md), [merchant UI limits](MERCHANT_UI.md), [AI limits](AI.md), [incident rules](INCIDENTS.md), [analysis rules](ANALYSIS.md) and [evidence acceptance](EVIDENCE.md).
+```text
+OPEN_HOME
+-> FIND_PRODUCT
+-> OPEN_PRODUCT
+-> SELECT_VARIANT
+-> ADD_TO_CART
+-> OPEN_CART
+-> BEGIN_CHECKOUT
+-> STOP
+```
+
+The merchant configures a product, optional variant, device, and frequency.
+
+Implemented supporting capabilities include:
+
+- Shopify installation/authentication and tenant-scoped persistence;
+- asynchronous runner execution;
+- Playwright desktop/mobile testing;
+- screenshots/traces/diagnostics;
+- deterministic findings, scoring, incidents, and recovery;
+- optional post-run AI experience analysis;
+- merchant UI;
+- scheduling and email alerts;
+- Shopify billing foundation;
+- operational hardening controls.
+
+A pass proves only the bounded tested path reached checkout initiation. It does not prove payment, every theme/app interaction, or whole-store health.
+
+## Planned evolution
+
+Phase 13 adds a separate autonomous run mode.
+
+It will use:
+
+```text
+mission
+-> sanitized observation
+-> model proposes semantic action
+-> validation + deterministic policy
+-> safe browser execution
+-> repeat within budgets
+```
+
+The model will not receive unrestricted Playwright access.
+
+The deterministic `PURCHASE_JOURNEY` remains supported and is not converted into an AI-driven flow.
+
+See:
+- `EVOLUTION.md`
+- `tasks/PHASE_13_AUTONOMOUS_SHOPPER.md`
+- `../adr/0018-agentic-shopper-control-boundary.md`
+
+## Product boundaries
+
+GhostShopper does not:
+
+- submit payment or intentionally create real orders;
+- use real customer sessions/data;
+- bypass authentication or anti-bot controls;
+- automatically edit merchant storefronts;
+- claim a subjective AI observation is a deterministic technical incident.
+
+Future roadmap capabilities must be added explicitly and documented as implemented only after acceptance.

@@ -1,50 +1,71 @@
 # GhostShopper
 
-Synthetic shopping for Shopify stores. The V1 journey stops at checkout initiation and never submits payment.
+GhostShopper is a Shopify app for synthetic shopping and AI mystery shopping.
 
-## Current status
+## Current product
 
-Phase 12 adds encrypted sessions, shared API rate limits, durable artifact deletion, protected readiness, optional metadata-only Sentry reporting and backup/restore tooling. Apply all eleven migrations and follow [production hardening and acceptance](docs/HARDENING.md). These controls do not establish deployment readiness until the documented infrastructure and restore checks pass. Local operation remains Docker-free.
+The implemented system runs a deterministic public-storefront journey:
 
-Phase 8 adds optional OpenAI experience analysis with versioned prompts, strict validated findings, separate tenant-scoped audit records and token/cost tracking. AI is disabled by default and cannot change technical outcomes or incidents. See [AI configuration and limits](docs/AI.md), [incident rules](docs/INCIDENTS.md), [analysis rules](docs/ANALYSIS.md) and [evidence setup](docs/EVIDENCE.md). Live Shopify acceptance still requires an authorized test store, PostgreSQL, Redis and private storage; AI additionally requires explicit evidence-transmission opt-in and provider configuration. [AGENT.md](AGENT.md) defines the build order.
-
-Phase 11 adds an opt-in Shopify paid plan, trial, Billing screen and atomic run allowances. Apply all ten migrations and follow [billing configuration and acceptance](docs/BILLING.md). No price is selected automatically; billing defaults off and test mode defaults on.
-
-## Run locally without Docker
-
-Use Node 22.15+ within major 22 and pnpm 10.34.6. If needed, install pnpm with `npm install --global pnpm@10.34.6`.
-
-```sh
-pnpm install --frozen-lockfile
-pnpm dev
+```text
+home -> find configured product -> open product -> select variant
+-> add to cart -> open cart -> begin checkout -> stop
 ```
 
-Open http://127.0.0.1:3000. The public shell runs without credentials and clearly indicates that setup is pending. Protected routes remain unavailable until configured; there is no authentication bypass.
+It includes desktop/mobile browser execution, evidence, deterministic findings, incidents, optional post-run AI experience analysis, scheduling, alerts, merchant UI, billing foundation, and production-hardening controls.
 
-For a real Shopify connection, follow [Shopify setup](docs/SHOPIFY_SETUP.md). Use a native or remote PostgreSQL database. Redis, MinIO, Docker and the runner are not needed for Phase 1.
+It never submits payment.
 
-Apply the migrations with `pnpm db:migrate`. See the [monitoring API](docs/MONITORING_API.md) for authenticated operations and [runner setup](docs/RUNNER.md) for native/remote Redis and S3 configuration. Set BROWSER_CHANNEL=chrome to use your installed Chrome without downloading a browser. In a second terminal, `pnpm dev:runner` builds and starts the queue consumer. Phase 9 adds merchant overview, monitor management, run/incident details, findings and private evidence screens. Phase 10 adds opt-in recurring scheduling and incident/recovery emails with bounded retries and spam prevention. Apply all ten migrations and follow [automation activation](docs/AUTOMATION.md); defaults do not send email or schedule runs. See [merchant UI and local preview](docs/MERCHANT_UI.md) and [Phase 11 billing](docs/BILLING.md).
+## Evolution
 
-| Command               | Purpose                                                                 |
-| --------------------- | ----------------------------------------------------------------------- |
-| `pnpm dev`            | Build shared packages and start the local Node/Vite web server          |
-| `pnpm dev:shopify`    | Start the official CLI tunnel and development-store preview             |
-| `pnpm db:migrate`     | Apply reviewed Prisma migrations to DATABASE_URL                        |
-| `pnpm build`          | Build both applications and all shared packages                         |
-| `pnpm start`          | Serve the production web build directly with Node                       |
-| `pnpm dev:runner`     | Build and run the asynchronous worker with Node                         |
-| `pnpm test:queue`     | Test real BullMQ delivery with dedicated PostgreSQL and Redis           |
-| `pnpm test:browser`   | Run controlled real-browser journeys without external services          |
-| `pnpm test:storage`   | Check uploads and private downloads against a dedicated S3 test bucket  |
-| `pnpm check`          | Lint, formatting, typecheck, unit and production HTTP integration tests |
-| `pnpm test:database`  | Lifecycle/isolation tests against a migrated TEST_DATABASE_URL          |
-| `pnpm security:check` | Audit the dependency lockfile                                           |
-| `pnpm format`         | Format source and documentation                                         |
+GhostShopper is evolving into a hybrid system:
 
-Root `.env` is optional for the public shell. Copy `.env.example` using `Copy-Item .env.example .env` in PowerShell, then fill in your own settings. Never commit secrets.
+- **deterministic monitors** for known repeatable purchase paths;
+- **autonomous mystery shoppers** for bounded exploratory customer behavior.
 
-## Repository
+The autonomous path is planned work. It does not replace the deterministic journey.
 
-`apps/web` is the Shopify application. `apps/runner` is the independent queue consumer and dispatch reconciler. Shared packages preserve domain, application, contracts and adapter boundaries. See [architecture](docs/ARCHITECTURE.md), [testing](docs/TESTING.md) and [operations](docs/OPERATIONS.md).
+Read:
+- [Product](docs/PRODUCT.md)
+- [Evolution boundaries](docs/EVOLUTION.md)
+- [Phase 13 task](docs/tasks/PHASE_13_AUTONOMOUS_SHOPPER.md)
 
-Optional Docker definitions from Phase 0 remain for CI/deployment; local commands above never invoke them.
+## AI coding workflow
+
+Codex/AI agents should start with:
+
+1. [AGENTS.md](AGENTS.md)
+2. [AGENT.md](AGENT.md)
+3. the current task packet
+
+Do **not** preload all documentation or ADRs. Use the [documentation router](docs/README.md) and [Codex workflow](docs/CODEX_WORKFLOW.md).
+
+A reusable implementation prompt is in [docs/prompts/AUTONOMOUS_EVOLUTION_PROMPT.md](docs/prompts/AUTONOMOUS_EVOLUTION_PROMPT.md).
+
+## Architecture
+
+Two deployables:
+
+- `apps/web` — Shopify integration, authenticated merchant UI/API, configuration and billing.
+- `apps/runner` — queued browser execution, evidence, analysis, scheduling and notifications.
+
+Internal workspace packages keep domain, application, contracts and adapters separated. See [architecture](docs/ARCHITECTURE.md).
+
+## Local commands
+
+Requires Node 22.15+ and pnpm 10.34.6.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm dev:runner
+pnpm test:browser
+pnpm check
+```
+
+PostgreSQL/Redis/storage are required only for the flows that depend on them. See [testing](docs/TESTING.md), [runner setup](docs/RUNNER.md), and [Shopify setup](docs/SHOPIFY_SETUP.md).
+
+## Safety
+
+Public authorized storefronts only. No payment submission, real-customer sessions, CAPTCHA bypass, or unrestricted AI browser control.
+
+The planned autonomous shopper must use validated semantic actions through a deterministic policy gate. See [ADR 0018](adr/0018-agentic-shopper-control-boundary.md).
